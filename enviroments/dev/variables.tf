@@ -21,10 +21,10 @@ variable "catalogs_names" {
     description = "The names of the Databricks catalogs to be used."
 }
 
-variable "schema_name" {
+variable "schema_names" {
     type        = list(string)
     default     = ["raw", "staging", "intermediate", "marts"]  
-    description = "The name of the Databricks schema to be used."
+    description = "The names of the Databricks schemas to be used."
 }
 
 # Cluster Settings
@@ -45,7 +45,7 @@ variable "resource_prefix" {
 # Alerts
 variable "alerts_on_failure" {
     type        = bool
-    default     = True
+    default     = true
 }
 
 # Git Integration
