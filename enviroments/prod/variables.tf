@@ -4,6 +4,11 @@ variable "databricks_host" {
     description = "The URL of the Databricks workspace."
 }
 
+variable "databricks_id" {
+    type        = string
+    description = "The ID of the Databricks workspace."
+}
+
 variable "databricks_token" {
     type        = string
     description = "The Databricks personal access token used for authentication."
