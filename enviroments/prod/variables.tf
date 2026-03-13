@@ -21,7 +21,7 @@ variable "databricks_workspace_name" {
 }
 
 # Catalog and Schema
-variable "catalogs_names_prod" {
+variable "catalogs_name_prod" {
     type        = list(string)
     description = "The names of the Databricks catalogs to be used."
 }
