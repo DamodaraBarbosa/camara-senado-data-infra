@@ -4,6 +4,11 @@ variable "databricks_host" {
     description = "The URL of the Databricks workspace."
 }
 
+variable "databricks_id" {
+    type        = string
+    description = "The ID of the Databricks workspace."
+}
+
 variable "databricks_token" {
     type        = string
     description = "The Databricks personal access token used for authentication."
@@ -16,7 +21,7 @@ variable "databricks_workspace_name" {
 }
 
 # Catalog and Schema
-variable "catalogs_names_prod" {
+variable "catalogs_name_prod" {
     type        = list(string)
     description = "The names of the Databricks catalogs to be used."
 }
