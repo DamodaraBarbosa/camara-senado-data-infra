@@ -5,7 +5,7 @@ locals {
   workspace_name = var.databricks_workspace_name
 
   # Catalog settings
-  catalog_name = var.catalogs_name_prod
+  catalog_name = var.catalogs_names
 
   catalog = [
     "${var.resource_prefix}_${catalog_name[0]}_${tags.environment}_db",
