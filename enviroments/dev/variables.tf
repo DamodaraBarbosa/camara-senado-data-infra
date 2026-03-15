@@ -83,7 +83,7 @@ variable "tags" {
     type = map(string)
     default = {
         "project" = "camara-senado-data-ingestion",
-        "environment" = "dev"
+        "environment" = "dev",
         "owner" = "data-engineering-team"
     }
 }

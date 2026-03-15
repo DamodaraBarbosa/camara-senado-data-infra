@@ -21,12 +21,12 @@ variable "databricks_workspace_name" {
 }
 
 # Catalog and Schema
-variable "catalogs_name_prod" {
+variable "catalogs_names" {
     type        = list(string)
     description = "The names of the Databricks catalogs to be used."
 }
 
-variable "schema_name_prod" {
+variable "schemas_names" {
     type        = list(string)
     default     = ["raw", "staging", "intermediate", "marts"]
     description = "The name of the Databricks schema to be used."
