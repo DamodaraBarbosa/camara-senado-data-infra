@@ -1,89 +1,82 @@
-# Databricks Configuration
-variable "databricks_host" {
+# Region config
+variable "aws_region" {
     type        = string
-    description = "The URL of the Databricks workspace."
+    default     = "us-east-1"
+    description = "AWS Region to deploy resources"
 }
 
-variable "databricks_id" {
+# Enviroment settings 
+variable "environment" {
     type        = string
-    description = "The ID of the Databricks workspace."
+    default     = "prod"
+    description = "Environment name"
 }
 
-variable "databricks_token" {
+variable "localstack_endpoint" {
     type        = string
-    description = "The Databricks personal access token used for authentication."
-    sensitive   = true
+    default     = "http://localhost:4566"
+    description = "Endpoint for LocalStack services"
 }
 
-variable "databricks_workspace_name" {
-    type        = string
-    description = "The name of the Databricks workspace."
-}
-
-# Catalog and Schema
+# Storage config
 variable "catalogs_names" {
     type        = list(string)
-    description = "The names of the Databricks catalogs to be used."
+    default     = ["raw", "staging", "intermediate", "marts"]
+    description = "List of Buckets S3 to create"
 }
 
-variable "schemas_names" {
+# Catalog config
+variable "schema_names" {
     type        = list(string)
     default     = ["raw", "staging", "intermediate", "marts"]
-    description = "The name of the Databricks schema to be used."
+    description = "List of schema names to create (e.g., raw, staging, intermediate, marts)"
 }
 
-# Cluster Settings
-variable "cluster_autotermination_minutes" {
+# Compute settings
+variable "emr_release_label" {
+    type        = string
+    default     = "emr-6.10.0"
+    description = "EMR release label to use for the cluster"
+}
+
+variable "cluster_master_instance_type" {
+    type        = string
+    default     = "m5.xlarge"
+    description = "Instance type for EMR master node"
+}
+
+variable "cluster_core_instance_type" {
+    type        = string
+    default     = "m5.xlarge"
+    description = "Instance type for EMR core nodes"
+}
+
+variable "cluster_instance_count" {
     type        = number
-    default     = 5
-    description = "The number of minutes of inactivity after which the cluster will be automatically terminated."
-
+    default     = 2
+    description = "Number of EMR core nodes"
 }
 
-# Resource Naming
+variable "cluster_auto_termination_minutes" {
+    type        = number
+    default     = 10
+    description = "Auto-termination time in minutes for EMR cluster"
+}
+
+# Resource naming config
 variable "resource_prefix" {
     type        = string
     default     = "dataplatform"
-    description = "The prefix to be used for all Databricks resources created by Terraform."
+    description = "Prefix for all resource names: buckets, roles ad IAM policies"
 }
 
-# Alerts
-variable "alerts_on_failure" {
-    type        = bool
-    default     = True
-}
-
-# Git Integration
-variable "git_provider" {
-    type        = string
-    default     = "gitHub"
-    description = "The Git provider to be used for the Databricks job code repository."
-
-}
-
-variable "git_username" {
-    type        = string
-    description = "The username for the Git repository containing the Databricks job code."
-}
-
-variable "git_repository_url" {
-    type        = string
-    default     = "https://github.com/damodara/camara-senado-data-ingestion.git"
-    description = "The URL of the Git repository containing the Databricks job code."
-}
-
-variable "git_branch" {
-    type        = string
-    default     = "main"
-    description = "The branch of the Git repository containing the Databricks job code."
-}
-
-# Tags
+# Infrastructure and CI/CD
 variable "tags" {
-    type = map(string)
+    type        = map(string)
     default = {
-        "project" = "camara-senado-data-ingestion",
-        "environment" = "prod"
-        "owner" = "data-engineering-team"
+      "project"     = "camara-senado-data-infra",
+      "environment" = "prod",
+      "owner"       = "data-engineering-team",
+      "managed_by"  = "terraform"
     }
 }
