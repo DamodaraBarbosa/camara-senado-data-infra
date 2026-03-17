@@ -12,6 +12,10 @@
 venv/
 .venv/
 
+# LocalStack / Docker
+.localstack/
+volume/
+
 # Credentials & Environment
 .env
 .databricks/
