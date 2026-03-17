@@ -59,7 +59,7 @@ variable "cluster_instance_count" {
 
 variable "cluster_auto_termination_minutes" {
     type        = number
-    default     = 10
+    default     = 10 * 60
     description = "Auto-termination time in minutes for EMR cluster"
 }
 

@@ -1,59 +1,52 @@
-# Group creation 
-resource "databricks_group" "groups" {
-    for_each     = toset(var.catalogs_names)
-    display_name = each.value.group_name  
+# Creation of Buckets S3
+resource "aws_s3_bucket" "catalog" {
+    for_each = toset(local.s3_buckets)
+
+    bucket   = each.value
+    tags     = var.tags
 }
 
-# Schema creation (Databases in Hive Metastore - Community/Free Edition compatible)
-resource "databricks_schema" "schemas" {
-    for_each = {
-        for item in flatten([
-            for cat in var.catalogs_names : [
-                for schema in var.schema_names : {
-                    # No Community Edition, simulamos a separação de catálogo no nome do schema
-                    full_name = "${cat}_${schema}"
+# Creation of roles IAM
+resource "aws_iam_role" "groups" {
+    assume_role_policy = jsonencode(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "ec2.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
                 }
             ]
-        ]) : item.full_name => item
-    }
+        }
+    )
+    tags = var.tags
+}
+
+# Creation of compute cluster
+resource "aws_emr_cluster" "dataplatform_cluster" {
+    name          = "${local.prefix}-${local.environment}-cluster"
+    release_label = var.emr_release_label
+    service_role  = aws_iam_role.groups.arn
     
-    catalog_name =  "main"
-    name    = each.value.full_name
-    comment = "Managed by Terraform: ${each.value.full_name}"
-}
-
-# Permissions grants assignments (Unity Catalog specific - disabled for Community Edition)
-/*
-resource "databricks_grants" "catalog_read_only" {
-    for_each = { for idx, grant in local.catalog_grants : idx => grant }
-   
-    catalog = each.value.catalog
-
-    dynamic "grant" {
-      for_each = each.value.read_only_groups
-        content {
-            principal  = grant.value
-            privileges = ["USE_CATALOG"]
-        }
+    auto_termination_policy {
+        idle_timeout = var.cluster_auto_termination_minutes
     }
 
-    # depends_on = [databricks_group.groups, databricks_catalog.catalogs]
-}
-
-resource "databricks_grants" "catalog_read_write" {
-    for_each = { for idx, grant in local.catalog_grants : idx => grant }
-   
-    catalog = each.value.catalog
-
-    dynamic "grant" {
-      for_each = each.value.read_write_groups
-        content {
-            principal  = grant.value
-            privileges = ["USE_CATALOG", "CREATE_SCHEMA", "CREATE_TABLE", "CREATE_VIEW", "CREATE_FUNCTION"]
-        }
+    ec2_attributes {
+        instance_profile = "EMR_EC2_DefaultRole"
     }
 
-    # depends_on = [databricks_group.groups, databricks_catalog.catalogs]
-}
-*/
+    master_instance_group {
+        instance_type = var.cluster_master_instance_type
+    }
 
+    core_instance_group {
+        instance_type  = var.cluster_core_instance_type
+    }
+
+    applications = ["Spark", "Hive"]
+    tags         = var.tags
+}
