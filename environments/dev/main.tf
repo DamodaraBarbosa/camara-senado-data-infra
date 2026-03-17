@@ -45,6 +45,7 @@ resource "aws_emr_cluster" "dataplatform_cluster" {
 
     core_instance_group {
         instance_type  = var.cluster_core_instance_type
+        instance_count = var.cluster_instance_count
     }
 
     applications = ["Spark", "Hive"]

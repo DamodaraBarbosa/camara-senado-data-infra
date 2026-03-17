@@ -53,7 +53,7 @@ variable "cluster_core_instance_type" {
 
 variable "cluster_instance_count" {
     type        = number
-    default     = 2
+    default     = 1
     description = "Number of EMR core nodes"
 }
 
