@@ -1,80 +1,39 @@
 locals {
-  # Workspace settings
-  workspace_host = var.databricks_host
-  workspace_id   = var.databricks_id
-  workspace_name = var.databricks_workspace_name
+  # Org tags
+  environment = var.tags.environment
+  project     = var.tags.project
+  prefix      = var.resource_prefix
 
-  # Catalog settings
-  catalog_name = var.catalogs_names
-
-  catalog = [
-    "${var.resource_prefix}_${catalog_name[0]}_${tags.environment}_db",
-    "${var.resource_prefix}_${catalog_name[1]}_${tags.environment}_db"
+  # Mapping of Buckets S3
+  s3_buckets = [
+    for name in var.catalogs_names : 
+    lower("${local.prefix}-${name}-${local.environment}-db")
   ]
 
-  # Users and groups settings
-  project_name = var.tags.project
+  # Roles configs
+    iam_roles = {
+    tech_leadership     = { name = "${local.prefix}_tech_leadership",     admin = true }
+    analytics_engineers = { name = "${local.prefix}_analytics_engineers", admin = false }
+    data_engineers      = { name = "${local.prefix}_data_engineers",      admin = false }
+    sp_bi               = { name = "${local.prefix}_sp_bi",               admin = false }
+    sp_ci               = { name = "${local.prefix}_sp_ci",               admin = false }
+    sp_env              = { name = "${local.prefix}_sp_${local.environment}", admin = false }
+  }
 
-  catalog_grants = [
-    {
-        catalog = "${var.resource_prefix}_${var.catalogs_names[0]}_${tags.environment}_db"
-        read_only_groups = [
-            "${var.resource_prefix}_sp_bi"
-        ]
-        read_write_groups = [
-            "${var.resource_prefix}_tech_leadership",
-            "${var.resource_prefix}_analytics_engineers",
-            "${var.resource_prefix}_data_engineers",
-            "${var.resource_prefix}_sp_ci",
-            "${var.resource_prefix}_sp_${var.tags.environment}"
-        ]
-    },
-    {
-        catalog = "${var.resource_prefix}_${var.catalogs_names[1]}_${tags.environment}_db"
-        read_only_groups = [
-            "${var.resource_prefix}_sp_bi"
-        ]
-        read_write_groups = [
-            "${var.resource_prefix}_tech_leadership",
-            "${var.resource_prefix}_analytics_engineers",
-            "${var.resource_prefix}_data_engineers",
-            "${var.resource_prefix}_sp_ci",
-            "${var.resource_prefix}_sp_${var.tags.environment}"
-        ]
-    }
-  ]
-
-  # Workspace groups assignments settings
-  workspace_groups_assignments = [
-    {
-        group_name = "${var.resource_prefix}_tech_leadership"
-        workspace_access = true
-        permissions = ["ADMIN"]
-    }, 
-    {
-        group_name = "${var.resource_prefix}_analytics_engineers"
-        workspace_access = true
-        permissions = ["USER"]
-    }, 
-    {
-        group_name = "${var.resource_prefix}_data_engineers"
-        workspace_access = true
-        permissions = ["USER"]
-    },
-    {
-        group_name = "${var.resource_prefix}_sp_bi"
-        workspace_access = true
-        permissions = ["USER"]
-    },
-    {
-        group_name = "${var.resource_prefix}_sp_ci"
-        workspace_access = true
-        permissions = ["USER"]
-    },
-    {
-        group_name = "${var.resource_prefix}_sp_${tags.environment}"
-        workspace_access = true
-        permissions = ["USER"]
+  # Roles grants
+  bucket_access_control = [
+    for bucket in local.s3_buckets : {
+      bucket_name = bucket
+      read_only_roles = [
+        local.iam_roles.sp_bi.name
+      ]
+      read_write_roles = [
+        local.iam_roles.tech_leadership.name,
+        local.iam_roles.analytics_engineers.name,
+        local.iam_roles.data_engineers.name,
+        local.iam_roles.sp_ci.name,
+        local.iam_roles.sp_env.name
+      ]
     }
   ]
 }
