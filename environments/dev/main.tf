@@ -29,6 +29,40 @@ resource "aws_s3_object" "schema_prefix" {
     depends_on = [aws_s3_bucket.catalog]
 }
 
+# Creation of IAM Groups
+resource "aws_iam_group" "groups" {
+    for_each = local.iam_groups
+    name     = "${local.prefix}_${each.key}"
+}
+
+# Creation of IAM Users
+locals {
+    user_to_group = flatten([
+        for group, users in local.iam_groups : [
+            for user in users : {
+                user  = user
+                group = group
+            }
+        ]
+    ])
+}
+
+resource "aws_iam_user" "users" {
+    for_each = toset([for u in local.user_to_group : u.user])
+    name     = each.value
+    tags     = var.tags
+}
+
+# Add Users to Groups
+resource "aws_iam_group_membership" "team" {
+    for_each = aws_iam_group.groups
+    name     = "${each.value.name}-membership"
+    group    = each.value.name
+    users    = [
+        for u in local.user_to_group : u.user if u.group == each.key
+    ]
+}
+
 # Creation of IAM roles
 resource "aws_iam_role" "data_roles" {
     for_each = local.iam_roles
