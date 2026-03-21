@@ -1,0 +1,30 @@
+# Local terraform state
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfvars.json
+
+# Terraform lock file
+.terraform.lock.hcl
+
+# Virtual environment
+venv/
+.venv/
+
+# LocalStack / Docker
+.localstack/
+volume/
+
+# Credentials & Environment
+.env
+.databricks/
+terraform.tfvars
+
+# Logs
+*.log
+crash.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
