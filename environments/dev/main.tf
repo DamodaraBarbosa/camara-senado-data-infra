@@ -79,7 +79,7 @@ resource "aws_iam_role" "data_roles" {
     tags = var.tags
 }
 
-# S3 read-only policy (leitura para contas de BI)
+# S3 read-only policy 
 resource "aws_iam_policy" "s3_read_only" {
     name = "${local.prefix}-s3-read-only"
 
@@ -98,7 +98,7 @@ resource "aws_iam_policy" "s3_read_only" {
     })
 }
 
-# S3 + Glue read-write policy (engenheiros e CI/CD)
+# S3 + Glue read-write policy 
 resource "aws_iam_policy" "s3_read_write" {
     name = "${local.prefix}-s3-read-write"
 
@@ -132,7 +132,7 @@ resource "aws_iam_policy" "s3_read_write" {
     })
 }
 
-# Vincular política de leitura às roles somente-leitura
+# Granting read policies to roles
 resource "aws_iam_role_policy_attachment" "read_only" {
     for_each = toset(flatten([
         for ac in local.bucket_access_control : ac.read_only_roles
@@ -142,7 +142,7 @@ resource "aws_iam_role_policy_attachment" "read_only" {
     depends_on = [aws_iam_role.data_roles]
 }
 
-# Vincular política de leitura/escrita às roles de engenharia e CI/CD
+# Granting read/write policies to engineering and CI/CD roles
 resource "aws_iam_role_policy_attachment" "read_write" {
     for_each = toset(flatten([
         for ac in local.bucket_access_control : ac.read_write_roles
