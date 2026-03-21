@@ -7,49 +7,142 @@ resource "aws_s3_bucket" "catalog" {
     tags          = var.tags
 }
 
-# Creation of roles IAM
-resource "aws_iam_role" "groups" {
-    assume_role_policy = jsonencode(
-        {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {
-                        "Service": "ec2.amazonaws.com"
-                    },
-                    "Action": "sts:AssumeRole"
+# Creation of schema prefixes inside S3 buckets (simulates Glue databases)
+locals {
+    schema_prefixes = {
+        for pair in flatten([
+            for bucket in local.s3_buckets : [
+                for schema in var.schema_names : {
+                    key    = "${bucket}/${schema}"
+                    bucket = bucket
+                    schema = schema
                 }
             ]
-        }
-    )
+        ]) : pair.key => pair
+    }
+}
+
+resource "aws_s3_object" "schema_prefix" {
+    for_each = local.schema_prefixes
+    bucket   = each.value.bucket
+    key      = "${each.value.schema}/"
+    content  = ""
+
+    depends_on = [aws_s3_bucket.catalog]
+}
+
+# Creation of IAM Groups
+resource "aws_iam_group" "groups" {
+    for_each = local.iam_groups
+    name     = "${local.prefix}_${each.key}"
+}
+
+# Creation of IAM Users
+locals {
+    user_to_group = flatten([
+        for group, users in local.iam_groups : [
+            for user in users : {
+                user  = user
+                group = group
+            }
+        ]
+    ])
+}
+
+# Add Users to Groups
+resource "aws_iam_group_membership" "team" {
+    for_each = aws_iam_group.groups
+    name     = "${each.value.name}-membership"
+    group    = each.value.name
+    users    = [for u in local.user_to_group : u.user if u.group == each.key]
+}
+
+# Creation of IAM Roles
+resource "aws_iam_role" "data_roles" {
+    for_each = local.iam_roles
+    name     = each.value.name
+
+    assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+            Effect    = "Allow"
+            Principal = { Service = "ec2.amazonaws.com" }
+            Action    = "sts:AssumeRole"
+        }]
+    })
     tags = var.tags
 }
 
-# Creation of compute cluster
-resource "aws_emr_cluster" "dataplatform_cluster" {
-    name          = "${local.prefix}-${local.environment}-cluster"
-    release_label = var.emr_release_label
-    service_role  = aws_iam_role.groups.arn
-    
-    auto_termination_policy {
-        idle_timeout = var.cluster_auto_termination_minutes
-    }
+# S3 read-only access policy
+resource "aws_iam_policy" "s3_read_only" {
+    name        = "${local.prefix}_s3_read_only"
+    description = "Policy for read-only access to S3 buckets"
+    policy      = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+            for bucket in local.bucket_access_control : {
+                Effect   = "Allow"
+                Action   = ["s3:GetObject", "s3:ListBucket"]
+                Resource = [
+                    "arn:aws:s3:::${bucket.bucket_name}",
+                    "arn:aws:s3:::${bucket.bucket_name}/*"
+                ]
+            }
+        ]
+    })
+    tags = var.tags
+} 
 
-    ec2_attributes {
-        instance_profile = "EMR_EC2_DefaultRole"
-    }
+# S3 + Glue read-write access policy
+resource "aws_iam_policy" "s3_read_write" {
+    name = "${local.prefix}-s3-read-write"
 
-    master_instance_group {
-        instance_type = var.cluster_master_instance_type
-        instance_count = var.cluster_instance_count
-    }
+    policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+            {
+                Effect = "Allow"
+                Action = [
+                    "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
+                    "s3:GetBucketLocation", "s3:ListBucket"
+                ]
+                Resource = flatten([
+                    for bucket in local.s3_buckets : [
+                        "arn:aws:s3:::${bucket}",
+                        "arn:aws:s3:::${bucket}/*"
+                    ]
+                ])
+            },
+            {
+                Effect = "Allow"
+                Action = [
+                    "glue:GetDatabase", "glue:GetDatabases",
+                    "glue:GetTable", "glue:GetTables",
+                    "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
+                    "glue:BatchCreatePartition", "glue:GetPartition", "glue:GetPartitions"
+                ]
+                Resource = ["*"]
+            }
+        ]
+    })
+}
 
-    core_instance_group {
-        instance_type  = var.cluster_core_instance_type
-    }
+# Granting read policies to roles
+resource "aws_iam_role_policy_attachment" "read_only" {
+    for_each = toset(flatten([
+        for ac in local.bucket_access_control : ac.read_only_roles
+    ]))
+    role       = each.value
+    policy_arn = aws_iam_policy.s3_read_only.arn
+    depends_on = [aws_iam_role.data_roles]
+}
 
-    termination_protection = var.environment == "prod" ? true : false
-    applications           = ["Spark", "Hive"]
-    tags                   = var.tags
+# Granting read/write policies to engineering and CI/CD roles
+resource "aws_iam_role_policy_attachment" "read_write" {
+    for_each = toset(flatten([
+        for ac in local.bucket_access_control : ac.read_write_roles
+    ]))
+    role       = each.value
+    policy_arn = aws_iam_policy.s3_read_write.arn
+    depends_on = [aws_iam_role.data_roles]
 }
