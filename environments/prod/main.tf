@@ -49,6 +49,12 @@ locals {
     ])
 }
 
+resource "aws_iam_user" "users" {
+    for_each = toset([for u in local.user_to_group : u.user])
+    name     = each.value
+    tags     = var.tags
+}
+
 # Add Users to Groups
 resource "aws_iam_group_membership" "team" {
     for_each = aws_iam_group.groups
