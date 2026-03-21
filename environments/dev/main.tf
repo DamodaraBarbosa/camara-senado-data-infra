@@ -56,7 +56,7 @@ resource "aws_iam_user" "users" {
 # Add Users to Groups
 resource "aws_iam_group_membership" "team" {
     for_each = aws_iam_group.groups
-    name     = "${each.value.name}-membership"
+    name     = "${each.value.name}_membership"
     group    = each.value.name
     users    = [
         for u in local.user_to_group : u.user if u.group == each.key
