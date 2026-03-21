@@ -21,7 +21,7 @@ variable "localstack_endpoint" {
 # Storage config
 variable "catalogs_names" {
     type        = list(string)
-    default     = ["raw", "staging", "intermediate", "marts"]
+    default     = ["camara", "senado"]
     description = "List of Buckets S3 to create"
 }
 

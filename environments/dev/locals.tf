@@ -7,7 +7,7 @@ locals {
   # Mapping of Buckets S3
   s3_buckets = [
     for name in var.catalogs_names : 
-    lower("${local.prefix}-${name}-${local.environment}-db")
+    lower("${local.prefix}_${name}_${local.environment}_db")
   ]
 
   # Roles configs
