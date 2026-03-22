@@ -7,7 +7,7 @@ locals {
   # Mapping of Buckets S3
   s3_buckets = [
     for name in var.catalogs_names : 
-    lower("${local.prefix}_${name}_${local.environment}_db")
+    lower("${local.prefix}-${name}-${local.environment}-db")
   ]
 
   # Roles configs
@@ -39,7 +39,7 @@ locals {
 
   # IAM Groups and Users mapping
   iam_groups = {
-    tech_leadership     = ["damodarabarbosa@gmail.com"]
+    tech_leadership     = ["damodara-developer"]
     analytics_engineers = ["analytics-eng-user"]
     data_engineers      = ["data-eng-user"]
     bi_users            = ["bi-user"]
