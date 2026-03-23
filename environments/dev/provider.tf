@@ -5,20 +5,15 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  backend "s3" {
+    bucket         = "dataplatform-terraform-state-damodarabarbosa-dev"
+    key            = "dev/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-state-lock"
+  }
 }
 
 provider "aws" {
-  access_key                  = "test"
-  secret_key                  = "test"
-  region                      = "us-east-1"
-  skip_credentials_validation = true
-  skip_requesting_account_id  = true
-  skip_metadata_api_check     = true
-  s3_use_path_style           = true
-
-  endpoints {
-    s3  = var.localstack_endpoint
-    iam = var.localstack_endpoint
-    sts = var.localstack_endpoint
-  }
+  region = var.aws_region
 }

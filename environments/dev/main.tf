@@ -5,28 +5,26 @@ resource "aws_s3_bucket" "catalog" {
     tags     = var.tags
 }
 
-# Creation of schema prefixes inside S3 buckets (simulates Glue databases)
-locals {
-    schema_prefixes = {
-        for pair in flatten([
-            for bucket in local.s3_buckets : [
-                for schema in var.schema_names : {
-                    key   = "${bucket}/${schema}"
-                    bucket = bucket
-                    schema = schema
-                }
-            ]
-        ]) : pair.key => pair
-    }
-}
+# Creation of Glue Catalog Databases 
+# Example: dataplatform_camara_dev_db.raw, dataplatform_camara_dev_db.staging
+resource "aws_glue_catalog_database" "catalog_db" {
+  for_each = {
+    for pair in flatten([
+      for bucket in local.s3_buckets : [
+        for schema in var.schema_names : {
+          key    = "${bucket}.${schema}"
+          db_name = "${bucket}_${schema}"
+        }
+      ]
+    ]) : pair.key => pair.db_name
+  }
+  
+  name = lower(each.value)
 
-resource "aws_s3_object" "schema_prefix" {
-    for_each = local.schema_prefixes
-    bucket   = each.value.bucket
-    key      = "${each.value.schema}/"
-    content  = ""
-
-    depends_on = [aws_s3_bucket.catalog]
+  parameters = {
+    PROJECT     = local.project
+    ENVIRONMENT = local.environment
+  }
 }
 
 # Creation of IAM Groups
