@@ -70,6 +70,13 @@ variable "resource_prefix" {
     description = "Prefix for all resource names: buckets, roles ad IAM policies"
 }
 
+# Instance settings 
+variable "extractor_instance_type" {
+    type        = string
+    default     = "t3.micro"
+    description = "Instance type for data extractor EC2 instance"
+}
+
 # Infrastructure and CI/CD
 variable "tags" {
     type        = map(string)
