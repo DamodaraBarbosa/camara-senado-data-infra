@@ -149,3 +149,77 @@ resource "aws_iam_role_policy_attachment" "read_write" {
     policy_arn = aws_iam_policy.s3_read_write.arn
     depends_on = [aws_iam_role.data_roles]
 }
+
+# EC2 Extractor settings 
+data "aws_ami" "amazon_linux_2023" {
+    most_recent = true
+    owners      = ["amazon"]
+
+    filter {
+        name   = "name"
+        values = ["aal2023-ami-*x86_64"]
+    }
+    filter {
+        name   = "state"
+        values = ["available"]
+    } 
+}
+
+resource "aws_security_group" "extractor" {
+    name = "${local.prefix}-extractor-sg"
+    description = "Security group for data extractor EC2 instance"
+
+    ingress {
+        from_port   = 443
+        to_port     = 443
+        protocol    = "tcp"
+        cidr_blocks = ["0.0.0.0/0"] 
+    }
+
+    tags = var.tags
+}
+
+# IAM Role EC2: S3 access and auto-termination permissions
+resource "aws_iam_role" "ec2_extractor" {
+    name = "${local.prefix}-ec2-extractor-role"
+
+    assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+            Effect    = "Allow"
+            Principal = { Service = "ec2.amazonaws.com" }
+            Action    = "sts:AssumeRole"
+        }]
+    })
+
+    tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_extractor_s3" {
+    role       = aws_iam_role.ec2_extractor.name
+    policy_arn = aws_iam_policy.s3_read_write.arn
+}
+
+resource "aws_iam_role_policy" "ec2_extractor_self_stop" {
+    name = "${local.prefix}_ec2_self_stop"
+    role = aws_iam_role.ec2_extractor.name
+
+    policy = jsonencode({
+        Version       = "2012-10-17"
+        Statement     = [{
+            Effect    = "Allow"
+            Action    = ["ec2:StopInstances"]
+            Resource  = ["arn:aws:ec2:${var.aws_region}:*:instance/*"]
+            Condition = {
+                StringEquals = {
+                    "ec2:ResourceTag/Name" = "${local.prefix}_extractor"
+                }
+            }
+        }]
+    })
+}
+
+resource "aws_iam_instace_profile" "extractor" {
+    name = "${local.prefix}_extractor_profile"
+    role = aws_iam_role.ec2_extractor.name
+}
