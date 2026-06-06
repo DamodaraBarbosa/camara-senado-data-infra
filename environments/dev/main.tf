@@ -27,6 +27,45 @@ resource "aws_glue_catalog_database" "catalog_db" {
   }
 }
 
+# ECR repositories creation
+resource "aws_ecr_repository" "repositories" {
+    for_each             = toset(local.ecr_repositories)
+    name                 = each.value
+    image_tag_mutability = "MUTABLE"
+
+    image_scanning_configuration {
+        scan_on_push = true
+    }
+
+    tags     = merge(
+        var.tags, {
+            Type = "ECR Repository"
+        }
+    )
+}
+
+# ECR life cycle policy to keep only the 2 most recent images
+resource "aws_ecr_lifecycle_policy" "lifecycle" {
+    for_each   = aws_ecr_repository.repositories
+    repository = each.value.name
+
+    policy = jsonencode({
+        rules = [
+            {
+                rulePriority = 1
+                description  = "Keep only the 2 most recent images"
+                selection    = {
+                    tagStatus     = "any"
+                    countType     = "imageCountMoreThan"
+                    countNumber   = 2
+                }
+                action       = {
+                    type = "expire"
+                }
+            }
+        ]
+    })
+}
 # Creation of IAM Groups
 resource "aws_iam_group" "groups" {
     for_each = local.iam_groups
@@ -130,6 +169,68 @@ resource "aws_iam_policy" "s3_read_write" {
     })
 }
 
+# ECR read-only policy
+resource "aws_iam_policy" "ecr_read_only" {
+    name = "${local.prefix}-ecr-read-only"
+
+    policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+            Effect = "Allow"
+            Action = [
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:DescribeImages",
+                "ecr:DescribeRepositories"
+            ]
+            Resource = [
+                for repo in local.ecr_repositories :
+                "arn:aws:ecr:${var.aws_region}:*:repository/${repo}"
+            ]
+        },
+        {
+            Effect = "Allow"
+            Action = [
+                "ecr:GetAuthorizationToken"
+            ]
+            Resource = ["*"]
+        }]
+    })
+}
+
+# ECR read-write policy
+resource "aws_iam_policy" "ecr_read_write" {
+    name = "${local.prefix}-ecr-read-write"
+
+    policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+            Effect = "Allow"
+            Action = [
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:PutImage",
+                "ecr:InitiateLayerUpload",
+                "ecr:UploadLayerPart",
+                "ecr:CompleteLayerUpload",
+                "ecr:DescribeImages",
+                "ecr:DescribeRepositories"
+            ]
+            Resource = [
+                for repo in local.ecr_repositories :
+                "arn:aws:ecr:${var.aws_region}:*:repository/${repo}"
+            ]
+        },
+        {
+            Effect = "Allow"
+            Action = [
+                "ecr:GetAuthorizationToken"
+            ]
+            Resource = ["*"]
+        }]
+    })
+}
+
 # Granting read policies to roles
 resource "aws_iam_role_policy_attachment" "read_only" {
     for_each = toset(flatten([
@@ -147,5 +248,30 @@ resource "aws_iam_role_policy_attachment" "read_write" {
     ]))
     role       = each.value
     policy_arn = aws_iam_policy.s3_read_write.arn
+    depends_on = [aws_iam_role.data_roles]
+}
+
+# Granting ECR read-only policies to BI and monitoring roles
+resource "aws_iam_role_policy_attachment" "ecr_read_only" {
+    for_each = toset([
+        local.iam_roles.sp_bi.name,
+        local.iam_roles.sp_ci.name
+    ])
+    role       = each.value
+    policy_arn = aws_iam_policy.ecr_read_only.arn
+    depends_on = [aws_iam_role.data_roles]
+}
+
+# Granting ECR read-write policies to engineering and deployment roles
+resource "aws_iam_role_policy_attachment" "ecr_read_write" {
+    for_each = toset([
+        local.iam_roles.tech_leadership.name,
+        local.iam_roles.analytics_engineers.name,
+        local.iam_roles.data_engineers.name,
+        local.iam_roles.sp_ci.name,
+        local.iam_roles.sp_env.name
+    ])
+    role       = each.value
+    policy_arn = aws_iam_policy.ecr_read_write.arn
     depends_on = [aws_iam_role.data_roles]
 }

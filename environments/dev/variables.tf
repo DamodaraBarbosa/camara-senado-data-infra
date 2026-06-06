@@ -32,6 +32,13 @@ variable "schema_names" {
     description = "List of schema names to create (e.g., raw, staging, intermediate, marts)"
 }
 
+# ECR services config
+variable "ecr_services" {
+    type        = list(string)
+    default     = ["docker-images-repository"]
+    description = "List of ECR services to create repositories for (e.g., docker-images-repository)"
+}
+
 # Compute settings
 variable "emr_release_label" {
     type        = string
