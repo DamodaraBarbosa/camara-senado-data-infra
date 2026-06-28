@@ -20,6 +20,12 @@ locals {
     sp_env              = { name = "${local.prefix}_sp_${local.environment}", admin = false }
   }
 
+  # ECR repositories
+  ecr_repositories = [
+    for service in var.ecr_services : 
+    lower("${local.prefix}-${service}-${local.environment}")
+  ]
+
   # Roles grants
   bucket_access_control = [
     for bucket in local.s3_buckets : {
