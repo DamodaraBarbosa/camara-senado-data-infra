@@ -6,23 +6,23 @@ locals {
 
   # Mapping of Buckets S3
   s3_buckets = [
-    for name in var.catalogs_names : 
+    for name in var.catalogs_names :
     lower("${local.prefix}-${name}-${local.environment}-db")
   ]
 
   # Roles configs
-    iam_roles = {
-    tech_leadership     = { name = "${local.prefix}_tech_leadership",     admin = true }
+  iam_roles = {
+    tech_leadership     = { name = "${local.prefix}_tech_leadership", admin = true }
     analytics_engineers = { name = "${local.prefix}_analytics_engineers", admin = false }
-    data_engineers      = { name = "${local.prefix}_data_engineers",      admin = false }
-    sp_bi               = { name = "${local.prefix}_sp_bi",               admin = false }
-    sp_ci               = { name = "${local.prefix}_sp_ci",               admin = false }
+    data_engineers      = { name = "${local.prefix}_data_engineers", admin = false }
+    sp_bi               = { name = "${local.prefix}_sp_bi", admin = false }
+    sp_ci               = { name = "${local.prefix}_sp_ci", admin = false }
     sp_env              = { name = "${local.prefix}_sp_${local.environment}", admin = false }
   }
 
   # ECR repositories
   ecr_repositories = [
-    for service in var.ecr_services : 
+    for service in var.ecr_services :
     lower("${local.prefix}-${service}-${local.environment}")
   ]
 
