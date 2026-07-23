@@ -12,12 +12,13 @@ locals {
 
   # Roles configs
     iam_roles = {
-    tech_leadership     = { name = "${local.prefix}_tech_leadership",     admin = true }
-    analytics_engineers = { name = "${local.prefix}_analytics_engineers", admin = false }
-    data_engineers      = { name = "${local.prefix}_data_engineers",      admin = false }
-    sp_bi               = { name = "${local.prefix}_sp_bi",               admin = false }
-    sp_ci               = { name = "${local.prefix}_sp_ci",               admin = false }
-    sp_env              = { name = "${local.prefix}_sp_${local.environment}", admin = false }
+    tech_leadership     = { name = "${local.prefix}_tech_leadership",     admin = true,  service = "ec2.amazonaws.com" }
+    analytics_engineers = { name = "${local.prefix}_analytics_engineers", admin = false, service = "ec2.amazonaws.com" }
+    data_engineers      = { name = "${local.prefix}_data_engineers",      admin = false, service = "ec2.amazonaws.com" }
+    sp_bi               = { name = "${local.prefix}_sp_bi",               admin = false, service = "ec2.amazonaws.com" }
+    sp_ci               = { name = "${local.prefix}_sp_ci",               admin = false, service = "ec2.amazonaws.com" }
+    sp_env              = { name = "${local.prefix}_sp_${local.environment}", admin = false, service = "ec2.amazonaws.com" }
+    airflow             = { name = "${local.prefix}_airflow",             admin = false, service = "ecs-tasks.amazonaws.com" }
   }
 
   # ECR repositories
@@ -38,7 +39,8 @@ locals {
         local.iam_roles.analytics_engineers.name,
         local.iam_roles.data_engineers.name,
         local.iam_roles.sp_ci.name,
-        local.iam_roles.sp_env.name
+        local.iam_roles.sp_env.name,
+        local.iam_roles.airflow.name
       ]
     }
   ]
