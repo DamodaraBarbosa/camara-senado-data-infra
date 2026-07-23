@@ -109,7 +109,7 @@ resource "aws_iam_role" "data_roles" {
         Version = "2012-10-17"
         Statement = [{
             Effect    = "Allow"
-            Principal = { Service = "ec2.amazonaws.com" }
+            Principal = { Service = each.value.service }
             Action    = "sts:AssumeRole"
         }]
     })
