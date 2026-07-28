@@ -3,7 +3,7 @@ locals {
 
   # IAM Groups and Users mapping — shared across dev and prod (IAM is account-wide, not per-environment)
   iam_groups = {
-    tech_leadership     = ["damodarabarbosa@gmail.com"]
+    tech_leadership     = ["damodarabarbosa@gmail.com", "damodara-developer"]
     analytics_engineers = ["analytics-eng-user"]
     data_engineers      = ["data-eng-user"]
     bi_users            = ["bi-user"]
