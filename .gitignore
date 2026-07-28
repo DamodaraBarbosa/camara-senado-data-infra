@@ -5,6 +5,7 @@
 *.tfstate.lock.info
 *.tfvars
 *.tfvars.json
+tfplan
 
 # Terraform lock file
 .terraform.lock.hcl

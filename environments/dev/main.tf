@@ -66,41 +66,10 @@ resource "aws_ecr_lifecycle_policy" "lifecycle" {
         ]
     })
 }
-# Creation of IAM Groups
-resource "aws_iam_group" "groups" {
-    for_each = local.iam_groups
-    name     = "${local.prefix}_${each.key}"
-}
-
-# Creation of IAM Users
-locals {
-    user_to_group = flatten([
-        for group, users in local.iam_groups : [
-            for user in users : {
-                user  = user
-                group = group
-            }
-        ]
-    ])
-}
-
-resource "aws_iam_user" "users" {
-    for_each = toset([for u in local.user_to_group : u.user])
-    name     = each.value
-    tags     = var.tags
-}
-
-# Add Users to Groups
-resource "aws_iam_group_membership" "team" {
-    for_each = aws_iam_group.groups
-    name     = "${each.value.name}_membership"
-    group    = each.value.name
-    users    = [
-        for u in local.user_to_group : u.user if u.group == each.key
-    ]
-}
-
 # Creation of IAM roles
+# Groups/users live in global/ (shared across environments); roles and their
+# policies stay per-environment since they scope access to this env's own
+# buckets/repos. create_before_destroy avoids a permission gap on renames.
 resource "aws_iam_role" "data_roles" {
     for_each = local.iam_roles
     name     = each.value.name
@@ -114,11 +83,19 @@ resource "aws_iam_role" "data_roles" {
         }]
     })
     tags = var.tags
+
+    lifecycle {
+        create_before_destroy = true
+    }
 }
 
-# S3 read-only policy 
+# S3 read-only policy
 resource "aws_iam_policy" "s3_read_only" {
-    name = "${local.prefix}-s3-read-only"
+    name = "${local.prefix}-s3-read-only-${local.environment}"
+
+    lifecycle {
+        create_before_destroy = true
+    }
 
     policy = jsonencode({
         Version = "2012-10-17"
@@ -135,9 +112,13 @@ resource "aws_iam_policy" "s3_read_only" {
     })
 }
 
-# S3 + Glue read-write policy 
+# S3 + Glue read-write policy
 resource "aws_iam_policy" "s3_read_write" {
-    name = "${local.prefix}-s3-read-write"
+    name = "${local.prefix}-s3-read-write-${local.environment}"
+
+    lifecycle {
+        create_before_destroy = true
+    }
 
     policy = jsonencode({
         Version = "2012-10-17"
@@ -171,7 +152,11 @@ resource "aws_iam_policy" "s3_read_write" {
 
 # ECR read-only policy
 resource "aws_iam_policy" "ecr_read_only" {
-    name = "${local.prefix}-ecr-read-only"
+    name = "${local.prefix}-ecr-read-only-${local.environment}"
+
+    lifecycle {
+        create_before_destroy = true
+    }
 
     policy = jsonencode({
         Version = "2012-10-17"
@@ -200,7 +185,11 @@ resource "aws_iam_policy" "ecr_read_only" {
 
 # ECR read-write policy
 resource "aws_iam_policy" "ecr_read_write" {
-    name = "${local.prefix}-ecr-read-write"
+    name = "${local.prefix}-ecr-read-write-${local.environment}"
+
+    lifecycle {
+        create_before_destroy = true
+    }
 
     policy = jsonencode({
         Version = "2012-10-17"
