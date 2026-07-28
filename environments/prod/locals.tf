@@ -21,6 +21,12 @@ locals {
     airflow             = { name = "${local.prefix}_airflow",             admin = false, service = "ecs-tasks.amazonaws.com" }
   }
 
+  # ECR repositories
+  ecr_repositories = [
+    for service in var.ecr_services :
+    lower("${local.prefix}-${service}-${local.environment}")
+  ]
+
   # Roles grants
   bucket_access_control = [
     for bucket in local.s3_buckets : {
