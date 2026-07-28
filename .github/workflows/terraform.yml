@@ -2,9 +2,8 @@ name: Terraform CI
 
 on:
   push:
-    # develop temporarily excluded: local infra was already applied to match
-    # feature/prod_parity_and_global_iam, re-add once that branch merges back
     branches:
+      - develop
       - main
   pull_request:
     branches:
