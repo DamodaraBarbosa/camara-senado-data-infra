@@ -275,3 +275,88 @@ resource "aws_iam_role_policy_attachment" "ecr_read_write" {
     policy_arn = aws_iam_policy.ecr_read_write.arn
     depends_on = [aws_iam_role.data_roles]
 }
+
+# ECS Cluster for data ingestion pipeline
+resource "aws_ecs_cluster" "ingestion_cluster" {
+    name = "${local.prefix}-ecs-cluster-${local.environment}"
+    tags = var.tags
+
+    setting {
+        name  = "containerInsights"
+        value = "enabled"
+    }
+}
+
+# ECS Cluster Capacity Providers
+resource "aws_ecs_cluster_capacity_providers" "ingestion_cluster_providers" {
+    cluster_name = aws_ecs_cluster.ingestion_cluster.name
+
+    capacity_providers = ["FARGATE", "FARGATE_SPOT"]
+
+    default_capacity_provider_strategy {
+        base              = 1
+        weight            = 100
+        capacity_provider = "FARGATE"
+    }
+}
+
+# IAM Role for ECS Task Execution
+resource "aws_iam_role" "ecs_task_execution_role" {
+    name = "${local.prefix}_ecs_task_execution_role_${local.environment}"
+
+    assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+            Effect    = "Allow"
+            Principal = { Service = "ecs-tasks.amazonaws.com" }
+            Action    = "sts:AssumeRole"
+        }]
+    })
+    tags = var.tags
+}
+
+# Attach ECS Task Execution Role Policy
+resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
+    role       = aws_iam_role.ecs_task_execution_role.name
+    policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# CloudWatch Log Group for ECS Tasks
+resource "aws_cloudwatch_log_group" "ingestion_logs" {
+    name              = "/ecs/${local.prefix}-ingestion-task-${local.environment}"
+    retention_in_days = 7
+    tags              = var.tags
+}
+
+# ECS Task Definition for Data Ingestion
+resource "aws_ecs_task_definition" "ingestion_task" {
+    family                   = "${local.prefix}-ingestion-task-${local.environment}"
+    network_mode             = "awsvpc"
+    requires_compatibilities = ["FARGATE"]
+    cpu                      = "1024"
+    memory                   = "2048"
+    execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+    task_role_arn            = aws_iam_role.data_roles["airflow"].arn
+
+    container_definitions = jsonencode([
+        {
+            name      = "ingestion-container"
+            image     = "python:3.11-slim"
+            essential = true
+            
+            logConfiguration = {
+                logDriver = "awslogs"
+                options = {
+                    "awslogs-group"         = aws_cloudwatch_log_group.ingestion_logs.name
+                    "awslogs-region"        = var.aws_region
+                    "awslogs-stream-prefix" = "ecs"
+                }
+            }
+            
+            # Container will receive command and environment from EcsRunTaskOperator
+            environment = []
+        }
+    ])
+
+    tags = var.tags
+}
