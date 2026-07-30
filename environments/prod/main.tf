@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 # Creation of Buckets S3
 resource "aws_s3_bucket" "catalog" {
     for_each = toset(local.s3_buckets)
@@ -146,7 +148,11 @@ resource "aws_iam_policy" "s3_read_write" {
                     "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
                     "glue:BatchCreatePartition", "glue:GetPartition", "glue:GetPartitions"
                 ]
-                Resource = ["*"]
+                Resource = [
+                    "arn:aws:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:catalog",
+                    "arn:aws:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:database/${local.prefix}*",
+                    "arn:aws:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${local.prefix}*/*"
+                ]
             }
         ]
     })
