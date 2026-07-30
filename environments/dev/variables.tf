@@ -5,7 +5,7 @@ variable "aws_region" {
     description = "AWS Region to deploy resources"
 }
 
-# Enviroment settings 
+# Environment settings
 variable "environment" {
     type        = string
     default     = "dev"
@@ -74,7 +74,7 @@ variable "cluster_auto_termination_minutes" {
 variable "resource_prefix" {
     type        = string
     default     = "dataplatform"
-    description = "Prefix for all resource names: buckets, roles ad IAM policies"
+    description = "Prefix for all resource names: buckets, roles and IAM policies"
 }
 
 # Infrastructure and CI/CD
