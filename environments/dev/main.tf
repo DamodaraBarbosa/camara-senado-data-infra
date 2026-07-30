@@ -379,6 +379,7 @@ resource "aws_iam_role" "github_actions_ci" {
         StringLike = {
           "token.actions.githubusercontent.com:sub" = [
             "repo:DamodaraBarbosa/camara-senado-data-infra:ref:refs/heads/develop",
+            "repo:DamodaraBarbosa/camara-senado-data-infra:ref:refs/heads/feature/*",
             "repo:DamodaraBarbosa/camara-senado-data-infra:pull_request"
           ]
         }
