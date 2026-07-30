@@ -396,20 +396,31 @@ resource "aws_iam_policy" "github_actions_ci_iam_scoped" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:TagRole",
-        "iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy", "iam:GetPolicyVersion",
-        "iam:CreatePolicyVersion", "iam:DeletePolicyVersion", "iam:ListPolicyVersions",
-        "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListAttachedRolePolicies",
-        "iam:PassRole"
-      ]
-      Resource = [
-        "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.prefix}_*",
-        "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${local.prefix}-*"
-      ]
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:TagRole",
+          "iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy", "iam:GetPolicyVersion",
+          "iam:CreatePolicyVersion", "iam:DeletePolicyVersion", "iam:ListPolicyVersions",
+          "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListAttachedRolePolicies",
+          "iam:PassRole"
+        ]
+        Resource = [
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.prefix}_*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${local.prefix}-*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:ListOpenIDConnectProviders",
+          "iam:ListRolePolicies",
+          "iam:GetOpenIDConnectProvider"
+        ]
+        Resource = "*"
+      }
+    ]
   })
 }
 
