@@ -1,3 +1,9 @@
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
+}
+
 # Creation of Buckets S3
 resource "aws_s3_bucket" "catalog" {
     for_each = toset(local.s3_buckets)
@@ -144,7 +150,11 @@ resource "aws_iam_policy" "s3_read_write" {
                     "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
                     "glue:BatchCreatePartition", "glue:GetPartition", "glue:GetPartitions"
                 ]
-                Resource = ["*"]
+                Resource = [
+                    "arn:aws:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:catalog",
+                    "arn:aws:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:database/${local.prefix}*",
+                    "arn:aws:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${local.prefix}*/*"
+                ]
             }
         ]
     })
@@ -348,4 +358,62 @@ resource "aws_ecs_task_definition" "ingestion_task" {
     ])
 
     tags = var.tags
+}
+
+# GitHub Actions CI/CD role with OIDC authentication
+resource "aws_iam_role" "github_actions_ci" {
+  name = "${local.prefix}_github_actions_${local.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = data.aws_iam_openid_connect_provider.github.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = "repo:DamodaraBarbosa/camara-senado-data-infra:ref:refs/heads/develop"
+        }
+      }
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_ci_power_user" {
+  role       = aws_iam_role.github_actions_ci.name
+  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
+}
+
+resource "aws_iam_policy" "github_actions_ci_iam_scoped" {
+  name = "${local.prefix}-github-actions-iam-${local.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:TagRole",
+        "iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy", "iam:GetPolicyVersion",
+        "iam:CreatePolicyVersion", "iam:DeletePolicyVersion", "iam:ListPolicyVersions",
+        "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListAttachedRolePolicies",
+        "iam:PassRole"
+      ]
+      Resource = [
+        "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.prefix}_*",
+        "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${local.prefix}-*"
+      ]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_ci_iam_scoped" {
+  role       = aws_iam_role.github_actions_ci.name
+  policy_arn = aws_iam_policy.github_actions_ci_iam_scoped.arn
 }
