@@ -5,7 +5,7 @@ variable "aws_region" {
     description = "AWS Region to deploy resources"
 }
 
-# Enviroment settings 
+# Environment settings
 variable "environment" {
     type        = string
     default     = "prod"
@@ -30,6 +30,13 @@ variable "schema_names" {
     type        = list(string)
     default     = ["raw", "staging", "intermediate", "marts"]
     description = "List of schema names to create (e.g., raw, staging, intermediate, marts)"
+}
+
+# ECR services config
+variable "ecr_services" {
+    type        = list(string)
+    default     = ["docker-images-repository"]
+    description = "List of ECR services to create repositories for (e.g., docker-images-repository)"
 }
 
 # Compute settings
@@ -67,7 +74,7 @@ variable "cluster_auto_termination_minutes" {
 variable "resource_prefix" {
     type        = string
     default     = "dataplatform"
-    description = "Prefix for all resource names: buckets, roles ad IAM policies"
+    description = "Prefix for all resource names: buckets, roles and IAM policies"
 }
 
 # Infrastructure and CI/CD

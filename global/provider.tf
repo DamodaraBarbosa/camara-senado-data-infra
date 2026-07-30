@@ -7,10 +7,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "dataplatform-terraform-state-damodarabarbosa-dev"
-    key            = "dev/terraform.tfstate"
-    region         = "us-east-1"
-    use_lockfile   = true
+    bucket       = "dataplatform-terraform-state-damodarabarbosa-global"
+    key          = "global/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
   }
 }
 

@@ -11,14 +11,24 @@ locals {
   ]
 
   # Roles configs
+  # Names are suffixed with the environment because IAM is account-wide, not
+  # per-environment: without the suffix, dev and prod would collide on the
+  # same role name and only one environment could ever own it.
     iam_roles = {
-    tech_leadership     = { name = "${local.prefix}_tech_leadership",     admin = true }
-    analytics_engineers = { name = "${local.prefix}_analytics_engineers", admin = false }
-    data_engineers      = { name = "${local.prefix}_data_engineers",      admin = false }
-    sp_bi               = { name = "${local.prefix}_sp_bi",               admin = false }
-    sp_ci               = { name = "${local.prefix}_sp_ci",               admin = false }
-    sp_env              = { name = "${local.prefix}_sp_${local.environment}", admin = false }
+    tech_leadership     = { name = "${local.prefix}_tech_leadership_${local.environment}",     service = "ec2.amazonaws.com" }
+    analytics_engineers = { name = "${local.prefix}_analytics_engineers_${local.environment}", service = "ec2.amazonaws.com" }
+    data_engineers      = { name = "${local.prefix}_data_engineers_${local.environment}",      service = "ec2.amazonaws.com" }
+    sp_bi               = { name = "${local.prefix}_sp_bi_${local.environment}",               service = "ec2.amazonaws.com" }
+    sp_ci               = { name = "${local.prefix}_sp_ci_${local.environment}",               service = "ec2.amazonaws.com" }
+    sp_env              = { name = "${local.prefix}_sp_${local.environment}", service = "ec2.amazonaws.com" }
+    airflow             = { name = "${local.prefix}_airflow_${local.environment}",             service = "ecs-tasks.amazonaws.com" }
   }
+
+  # ECR repositories
+  ecr_repositories = [
+    for service in var.ecr_services :
+    lower("${local.prefix}-${service}-${local.environment}")
+  ]
 
   # Roles grants
   bucket_access_control = [
@@ -32,15 +42,9 @@ locals {
         local.iam_roles.analytics_engineers.name,
         local.iam_roles.data_engineers.name,
         local.iam_roles.sp_ci.name,
-        local.iam_roles.sp_env.name
+        local.iam_roles.sp_env.name,
+        local.iam_roles.airflow.name
       ]
     }
   ]
-# IAM Groups and Users mapping
-  iam_groups = {
-    tech_leadership     = ["damodarabarbosa@gmail.com"]
-    analytics_engineers = ["analytics-eng-user"]
-    data_engineers      = ["data-eng-user"]
-    bi_users            = ["bi-user"]
-  }
 }
