@@ -19,7 +19,7 @@ def get_iam_structure():
         groups = iam.list_groups().get('Groups', [])
         
         if not groups:
-            console.print("[yellow]Nenhum grupo encontrado no LocalStack.[/yellow]")
+            console.print("[yellow]No groups found in LocalStack.[/yellow]")
             return
 
         for group in groups:
