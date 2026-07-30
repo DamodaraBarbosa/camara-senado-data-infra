@@ -1,8 +1,13 @@
-# Camara & Senado Data Infrastructure
+# 🏛️ Camara & Senado Data Infrastructure
+
+![Terraform CI](https://github.com/DamodaraBarbosa/camara-senado-data-infra/actions/workflows/terraform.yml/badge.svg)
+![Terraform](https://img.shields.io/badge/Terraform-1.14.7-844FBA?logo=terraform&logoColor=white)
+![IaC](https://img.shields.io/badge/IaC-Terraform-844FBA)
+![Cloud](https://img.shields.io/badge/Cloud-AWS-FF9900?logo=amazonaws&logoColor=white)
 
 This repository contains the Infrastructure as Code (IaC) to manage the data platform for the Chamber of Deputies and the Senate. It uses Terraform to provision AWS resources (or LocalStack for local development) and includes a CI/CD pipeline via GitHub Actions with OIDC authentication.
 
-## Project Structure
+## 📁 Project Structure
 
 - `environments/`: Environment-specific Terraform configurations.
   - `dev/`: Development environment (targets LocalStack by default, can be re-configured for AWS).
@@ -15,37 +20,45 @@ This repository contains the Infrastructure as Code (IaC) to manage the data pla
 - `requirements.txt`: Python dependencies for utility scripts.
 - `docker-compose.yml`: LocalStack service configuration for local development.
 
-## Infrastructure Overview
+## 🏗️ Infrastructure Overview
 
 Each environment (`dev` and `prod`) provisions the following AWS resources:
 
-### Storage & Catalog
+### 🗄️ Storage & Catalog
 - **S3 Buckets**: One per catalog (`camara`, `senado`), named `dataplatform-{catalog}-{environment}-db`.
 - **AWS Glue Catalog Databases**: One per bucket and schema layer (`raw`, `staging`, `intermediate`, `marts`), enabling queryable data structures.
 
-### Container Registry
+### 🐳 Container Registry
 - **ECR Repositories**: Docker image storage for the data ingestion pipeline, with a lifecycle policy retaining only the 2 most recent images.
 
-### Access Control
-- **IAM Roles** with scoped permissions:
-  - `tech_leadership`, `analytics_engineers`, `data_engineers`: full S3 + Glue read-write; ECR read-write.
-  - `sp_bi`: S3 read-only; ECR read-only.
-  - `sp_ci`, `sp_env`: S3 read-write; ECR read-write.
-  - `airflow`: used by the ECS task definition; S3 + Glue read-write.
-- **GitHub Actions CI/CD Role**: Assumed via OIDC (no static AWS keys); scoped to `PowerUserAccess` + tightly-restricted IAM permissions for resource management.
+### 🔐 Access Control
 
-### Data Ingestion Pipeline
+IAM roles with scoped permissions:
+
+| Role | S3 + Glue | ECR |
+|---|---|---|
+| `tech_leadership` | Read-write | Read-write |
+| `analytics_engineers` | Read-write | Read-write |
+| `data_engineers` | Read-write | Read-write |
+| `sp_bi` | Read-only | Read-only |
+| `sp_ci` | Read-write | Read-write |
+| `sp_env` | Read-write | Read-write |
+| `airflow` | Read-write | — |
+
+**GitHub Actions CI/CD Role**: Assumed via OIDC (no static AWS keys); scoped to `PowerUserAccess` + tightly-restricted IAM permissions for resource management.
+
+### ⚙️ Data Ingestion Pipeline
 - **ECS Fargate Cluster**: Orchestrates containerized data processing tasks.
 - **ECS Task Definition**: Python 3.11 container provisioned with Airflow role; logs to CloudWatch. Meant to be invoked by an external orchestrator (e.g., an Airflow `EcsRunTaskOperator`).
 
-## Prerequisites
+## ✅ Prerequisites
 
-- [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
-- [Terraform](https://www.terraform.io/) (v1.0.0+)
-- [AWS CLI](https://aws.amazon.com/cli/)
-- [Python 3.x](https://www.python.org/)
+- 🐳 [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
+- 🧱 [Terraform](https://www.terraform.io/) (v1.0.0+)
+- ☁️ [AWS CLI](https://aws.amazon.com/cli/)
+- 🐍 [Python 3.x](https://www.python.org/)
 
-## Installation & Setup
+## 🛠️ Installation & Setup
 
 ### 1. Python Environment
 It is highly recommended to use a virtual environment to run the utility scripts.
@@ -68,7 +81,7 @@ The project uses LocalStack to simulate AWS services locally.
 docker compose up -d
 ```
 
-## Local Development (Dev Environment)
+## 💻 Local Development (Dev Environment)
 
 Navigate to the `dev` environment to provision local resources:
 
@@ -78,7 +91,7 @@ terraform init
 terraform apply
 ```
 
-### Utility Scripts
+### 🧰 Utility Scripts
 
 List the IAM hierarchy (Groups, Users, and Roles) created in LocalStack:
 
@@ -87,7 +100,7 @@ List the IAM hierarchy (Groups, Users, and Roles) created in LocalStack:
 python utils/list_iam.py
 ```
 
-### Verification
+### 🔍 Verification
 
 Manually verify created resources using the AWS CLI pointing to LocalStack:
 
@@ -95,23 +108,20 @@ Manually verify created resources using the AWS CLI pointing to LocalStack:
 - **IAM Users:** `aws --endpoint-url=http://localhost:4566 iam list-users`
 - **IAM Groups:** `aws --endpoint-url=http://localhost:4566 iam list-groups`
 
-## CI/CD with GitHub Actions
+## 🔄 CI/CD with GitHub Actions
 
 The repository includes a GitHub Actions workflow (`.github/workflows/terraform.yml`) that automatically applies Terraform changes using keyless OIDC authentication — no static AWS credentials are stored or used.
 
-### Workflow Triggers and Jobs
+### ⚡ Workflow Triggers and Jobs
 
-- **`terraform-dev` job**: Triggered on push or pull request to `develop` branch.
-  - Runs `terraform init`, `validate`, and `plan` for the dev environment.
-  - Automatically applies changes (`terraform apply -auto-approve`) only on push; PRs are plan-only.
-  - Assumes role `AWS_ROLE_ARN_DEV` via OIDC.
+| Job | Trigger | Auto-Apply | IAM Role |
+|---|---|---|---|
+| `terraform-dev` | Push/PR to `develop` | Push only | `AWS_ROLE_ARN_DEV` |
+| `terraform-prod` | Push/PR to `main` | Push only | `AWS_ROLE_ARN_PROD` |
 
-- **`terraform-prod` job**: Triggered on push or pull request to `main` branch.
-  - Runs `terraform init`, `validate`, and `plan` for the prod environment.
-  - Automatically applies changes (`terraform apply -auto-approve`) only on push; PRs are plan-only.
-  - Assumes role `AWS_ROLE_ARN_PROD` via OIDC.
+Both jobs always run `terraform init`, `validate`, and `plan`. PRs are plan-only — `terraform apply -auto-approve` runs only on push events.
 
-### Setup Requirements
+### 🔧 Setup Requirements
 
 To enable the GitHub Actions workflow, configure the following **repository variables** (not secrets) in your GitHub repository settings:
 
@@ -120,7 +130,7 @@ To enable the GitHub Actions workflow, configure the following **repository vari
 
 The workflow uses `aws-actions/configure-aws-credentials@v4` with the `role-to-assume` parameter pointing to these roles. The OIDC trust relationship is pre-configured in the IAM role and restricts assumptions to events from the GitHub repository and branch specified in the role's trust policy.
 
-### Deployment Workflow
+### 🚀 Deployment Workflow
 
 1. Create a new branch for your infrastructure changes.
 2. Push to `develop` and open a pull request to test changes in the `dev` environment (plan-only).
@@ -130,4 +140,4 @@ The workflow uses `aws-actions/configure-aws-credentials@v4` with the `role-to-a
 
 ---
 
-*Maintained by the Data Engineering Team.*
+🏛️ *Maintained by the Data Engineering Team.*
