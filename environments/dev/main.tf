@@ -377,7 +377,10 @@ resource "aws_iam_role" "github_actions_ci" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:DamodaraBarbosa/camara-senado-data-infra:*"
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:DamodaraBarbosa/camara-senado-data-infra:*",
+            "repo:DamodaraBarbosa/camara-senado-data-ingestion:*"
+          ]
         }
       }
     }]
