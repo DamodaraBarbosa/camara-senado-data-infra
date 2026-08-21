@@ -408,6 +408,7 @@ resource "aws_iam_policy" "github_actions_ci_iam_scoped" {
         Effect = "Allow"
         Action = [
           "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:TagRole",
+          "iam:UpdateAssumeRolePolicy",
           "iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy", "iam:GetPolicyVersion",
           "iam:CreatePolicyVersion", "iam:DeletePolicyVersion", "iam:ListPolicyVersions",
           "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListAttachedRolePolicies",
