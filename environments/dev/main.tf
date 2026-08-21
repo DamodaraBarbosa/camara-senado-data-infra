@@ -340,7 +340,7 @@ resource "aws_ecs_task_definition" "ingestion_task" {
     container_definitions = jsonencode([
         {
             name      = "ingestion-container"
-            image     = "python:3.11-slim"
+            image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.ingestion_ecr_repository}:${var.ingestion_image_tag}"
             essential = true
             
             logConfiguration = {
@@ -377,7 +377,10 @@ resource "aws_iam_role" "github_actions_ci" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:DamodaraBarbosa/camara-senado-data-infra:*"
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:DamodaraBarbosa/camara-senado-data-infra:*",
+            "repo:DamodaraBarbosa/camara-senado-data-ingestion:*"
+          ]
         }
       }
     }]
@@ -401,6 +404,7 @@ resource "aws_iam_policy" "github_actions_ci_iam_scoped" {
         Effect = "Allow"
         Action = [
           "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:TagRole",
+          "iam:UpdateAssumeRolePolicy",
           "iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy", "iam:GetPolicyVersion",
           "iam:CreatePolicyVersion", "iam:DeletePolicyVersion", "iam:ListPolicyVersions",
           "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListAttachedRolePolicies",
