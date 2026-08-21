@@ -340,7 +340,7 @@ resource "aws_ecs_task_definition" "ingestion_task" {
     container_definitions = jsonencode([
         {
             name      = "ingestion-container"
-            image     = "python:3.11-slim"
+            image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.ingestion_ecr_repository}:${var.ingestion_image_tag}"
             essential = true
             
             logConfiguration = {

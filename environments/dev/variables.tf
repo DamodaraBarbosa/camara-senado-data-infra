@@ -39,6 +39,21 @@ variable "ecr_services" {
     description = "List of ECR services to create repositories for (e.g., docker-images-repository)"
 }
 
+# Ingestion application image
+# The "camara-ingestion" ECR repository is published by camara-senado-data-ingestion's
+# own CI/CD (.github/workflows/ci.yml), not by this repository's Terraform.
+variable "ingestion_ecr_repository" {
+    type        = string
+    default     = "camara-ingestion"
+    description = "ECR repository name of the ingestion application image"
+}
+
+variable "ingestion_image_tag" {
+    type        = string
+    default     = "latest"
+    description = "Tag of the ingestion image to deploy in the ECS task definition"
+}
+
 # Compute settings
 variable "emr_release_label" {
     type        = string
