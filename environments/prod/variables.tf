@@ -85,6 +85,16 @@ variable "cluster_auto_termination_minutes" {
     description = "Auto-termination time in minutes for EMR cluster"
 }
 
+# Alerting
+# Endpoint da assinatura do topico SNS de alertas. A confirmacao chega por
+# e-mail e precisa ser clicada uma vez — ate la o Terraform mantem a
+# subscription em "pending confirmation" e nada e entregue.
+variable "alert_email" {
+    type        = string
+    default     = "damodarabarbosa@gmail.com"
+    description = "E-mail que recebe os alertas de falha do pipeline"
+}
+
 # Resource naming config
 variable "resource_prefix" {
     type        = string
