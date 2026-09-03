@@ -13,6 +13,27 @@ resource "aws_s3_bucket" "catalog" {
     tags          = var.tags
 }
 
+# Versionamento dos buckets de dados.
+#
+# Nao e politica generica de "boa pratica": e a resposta a um incidente real.
+# Na run scheduled__2026-08-23 uma segunda tentativa da mesma task gravou `[]`
+# por cima do resultado bom da primeira, na mesma chave — raw/votacoes/votacoes
+# foi de 42.050 registros (40MB) para 2 bytes, e as 56 tasks reportaram
+# success. Sem versionamento o dado era irrecuperavel.
+#
+# Isto e a rede de seguranca, nao a correcao: a causa esta em
+# task_io.py::_write_s3, que escreve numa chave deterministica por run_id sem
+# nenhuma protecao contra sobrescrita. Ver
+# camara-senado-data-ingestion/AUDITORIA_PRODUCAO_2026-09-02.md (P0-2).
+resource "aws_s3_bucket_versioning" "catalog" {
+    for_each = aws_s3_bucket.catalog
+    bucket   = each.value.id
+
+    versioning_configuration {
+        status = "Enabled"
+    }
+}
+
 # Creation of Glue Catalog Databases
 # Example: dataplatform_camara_prod_db.raw, dataplatform_camara_prod_db.staging
 resource "aws_glue_catalog_database" "catalog_db" {
@@ -324,9 +345,30 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
 
 # CloudWatch Log Group for ECS Tasks
 resource "aws_cloudwatch_log_group" "ingestion_logs" {
-    name              = "/ecs/${local.prefix}-ingestion-task-${local.environment}"
-    retention_in_days = 7
+    name = "/ecs/${local.prefix}-ingestion-task-${local.environment}"
+    # Eram 7 dias, mais curto que o intervalo entre duas execucoes semanais:
+    # quando a run seguinte comecava, o log da anterior ja tinha expirado e o
+    # post-mortem era impossivel. 30 dias cobrem quatro execucoes.
+    retention_in_days = 30
     tags              = var.tags
+}
+
+# Topico de alerta do pipeline.
+#
+# Ate agora uma falha em producao era totalmente silenciosa: email_on_failure
+# desligado na DAG, sem SMTP, sem topico SNS e sem alarme no CloudWatch. Numa
+# cadencia semanal isso significa descobrir a falha uma semana depois, na
+# melhor das hipoteses. Consumido pelo on_failure_callback da DAG
+# (camara-senado-data-ingestion, airflow/dags/camera_ingestion_dag.py).
+resource "aws_sns_topic" "alerts" {
+    name = "${local.prefix}-alerts-${local.environment}"
+    tags = var.tags
+}
+
+resource "aws_sns_topic_subscription" "alerts_email" {
+    topic_arn = aws_sns_topic.alerts.arn
+    protocol  = "email"
+    endpoint  = var.alert_email
 }
 
 # ECS Task Definition for Data Ingestion
