@@ -26,7 +26,22 @@ Bucket `dataplatform-camara-prod-db` com SSE-AES256 e Public Access Block comple
 
 ---
 
-## Aplicado na Sprint 0 (2026-09-03)
+## Aplicado na Sprint 0 (2026-09-03) — concluído e verificado
+
+Mergeado em `main` via PRs #28 e #29 (`6e8fd47`), aplicado pelo job "Terraform Prod" com
+**`Plan: 4 to add, 1 to change, 0 to destroy`** — nenhum bucket, role, cluster ou task
+definition foi tocado. Estado conferido na AWS depois do apply:
+
+| recurso | verificação |
+|---|---|
+| `dataplatform-alerts-prod` | criado |
+| assinatura de e-mail | **confirmada** — `SubscriptionArn` = `...:6de0ee52-...` |
+| versionamento | `Enabled` em `dataplatform-camara-prod-db` e `dataplatform-senado-prod-db` |
+| retenção do log group | `30` |
+| `sns:Publish` no role | presente na policy inline `dataplatform-airflow-ec2-ecs` |
+
+O e-mail de confirmação da AWS caiu no spam. Vale marcar `no-reply@sns.amazonaws.com` como
+remetente confiável — um alerta que vai para o spam equivale a não ter alerta.
 
 Tudo em `environments/prod/`:
 
@@ -48,7 +63,11 @@ Tudo em `environments/prod/`:
 
 Fora do Terraform, aplicado diretamente porque o role é provisionado à mão pelo runbook:
 `sns:Publish` na policy inline `dataplatform-airflow-ec2-ecs` do role
-`dataplatform_airflow_ec2`.
+`dataplatform_airflow_ec2` (6 → 7 statements).
+
+Essa statement é exatamente o tipo de coisa que o item "host do Airflow para IaC" abaixo
+existe para eliminar: ela vive fora do `terraform apply`, ninguém a vê num plan, e o próximo
+`put-role-policy` feito à mão pode sobrescrevê-la sem aviso.
 
 ---
 
@@ -91,8 +110,15 @@ onde escrever.
 
 - [ ] **Lifecycle policy no bucket prod.** Hoje não existe nenhuma
       (`NoSuchLifecycleConfiguration`); ~600 MB brutos por semana acumulam em Standard
-      indefinidamente. Com versionamento agora ligado, isso passa a incluir versões
-      antigas — vale uma regra de expiração de versões não-atuais.
+      indefinidamente. Com o versionamento **agora ligado** (Sprint 0), isso passou a incluir
+      versões não-atuais, então a regra de expiração de versões antigas deixou de ser
+      hipótese e virou custo real acumulando por semana.
+- [ ] **Lifecycle no repositório ECR `camara-ingestion`.** A regra de "manter só as 2
+      imagens mais recentes" é aplicada por `aws_ecr_lifecycle_policy.lifecycle` apenas aos
+      repositórios de `local.ecr_repositories` (`dataplatform-docker-images-repository-*`).
+      O `camara-ingestion`, que é o que a task definition de produção realmente usa, foi
+      criado fora do IaC e **não tem lifecycle nenhum** — por isso acumula imagens sem tag a
+      cada build. Vale trazê-lo para o Terraform junto com a regra.
 - [ ] **Isolamento de rede dev/prod.** `NETWORK_CONFIGURATION` na DAG
       (`camara-senado-data-ingestion/airflow/dags/camera_ingestion_dag.py`) tem 6 subnets e
       1 security group **hardcoded**, compartilhados entre dev e prod, com
