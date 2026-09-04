@@ -1,14 +1,27 @@
 name: Terraform CI
 
 on:
+  # Um PR que so toca markdown nao deveria exigir aprovacao de environment nem
+  # um terraform plan. O PR #30, so com a auditoria em .md, ficou 44h em
+  # `pending` travado no gate do environment `development` por causa disso.
   push:
     branches:
       - develop
       - main
+    paths-ignore:
+      - '**.md'
+      - 'utils/**'
+      - 'docker-compose.yml'
+      - 'requirements.txt'
   pull_request:
     branches:
       - develop
       - main
+    paths-ignore:
+      - '**.md'
+      - 'utils/**'
+      - 'docker-compose.yml'
+      - 'requirements.txt'
 
 env:
   AWS_REGION: us-east-1
