@@ -530,7 +530,9 @@ resource "aws_iam_role_policy_attachment" "dlm_lifecycle" {
 # depois da run semanal (domingo 06:00 UTC, ~42 min), para que o snapshot de
 # domingo ja contenha o resultado dela.
 resource "aws_dlm_lifecycle_policy" "airflow_metadata" {
-    description        = "Snapshot diario do metadata DB do Airflow (host ${var.airflow_instance_id})"
+    # A descricao da DLM so aceita [0-9A-Za-z _-]: parenteses reprovam na
+    # validacao da API, em tempo de plan.
+    description        = "Snapshot diario do metadata DB do Airflow - host ${var.airflow_instance_id}"
     execution_role_arn = aws_iam_role.dlm_lifecycle.arn
     state              = "ENABLED"
 
