@@ -112,3 +112,18 @@ variable "tags" {
       "managed_by"  = "terraform"
     }
 }
+# Host do Airflow, provisionado a mao pelo
+# camara-senado-data-ingestion/docs/PROD_AIRFLOW_EC2_RUNBOOK.md. Referenciado
+# aqui — e nao criado — porque o backup e o alarme sao aditivos: cobrem o risco
+# sem exigir o `terraform import` da instancia inteira.
+variable "airflow_instance_id" {
+    description = "ID da instancia EC2 que hospeda o scheduler/triggerer do Airflow."
+    type        = string
+    default     = "i-0e11709bd1c1dae07"
+}
+
+variable "airflow_data_volume_id" {
+    description = "ID do volume EBS com o metadata DB do Airflow (volume Docker do postgres-airflow)."
+    type        = string
+    default     = "vol-06402ad2abd2d4999"
+}
