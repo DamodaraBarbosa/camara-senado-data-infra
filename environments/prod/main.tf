@@ -507,7 +507,11 @@ resource "aws_ec2_tag" "airflow_data_volume_backup" {
 }
 
 resource "aws_iam_role" "dlm_lifecycle" {
-    name = "${local.prefix}-dlm-lifecycle-${local.environment}"
+    # Underscore, nao hifen: a policy escopada do role de CI
+    # (github_actions_ci_iam_scoped) so autoriza iam:CreateRole em
+    # `role/${local.prefix}_*`. Com hifen o apply reprova com AccessDenied
+    # depois de ja ter criado os outros recursos.
+    name = "${local.prefix}_dlm_lifecycle_${local.environment}"
 
     assume_role_policy = jsonencode({
         Version = "2012-10-17"
