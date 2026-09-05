@@ -478,3 +478,209 @@ resource "aws_iam_role_policy_attachment" "github_actions_ci_iam_scoped" {
   role       = aws_iam_role.github_actions_ci.name
   policy_arn = aws_iam_policy.github_actions_ci_iam_scoped.arn
 }
+
+# ---------------------------------------------------------------------------
+# Host do Airflow: backup e auto-recovery
+#
+# A instancia, seu security group, role, instance profile, swapfile e os dois
+# crons existem apenas como checklist manual em
+# camara-senado-data-ingestion/docs/PROD_AIRFLOW_EC2_RUNBOOK.md — o modules/
+# deste repositorio esta vazio. Trazer o host inteiro para o Terraform e um
+# `terraform import` grande e arriscado; estes recursos sao aditivos e cobrem o
+# risco concreto sem tocar na instancia viva:
+#
+#   - o metadata DB do Airflow (estado de pause das DAGs e todo o historico)
+#     vive num volume Docker no EBS **sem nenhum snapshot**;
+#   - a conta tem **zero alarmes CloudWatch**, entao o host ficou inacessivel
+#     por 4 dias (5 OOM-kills entre 30 e 31/08) sem ninguem ser avisado.
+# ---------------------------------------------------------------------------
+
+# O volume nao tem tag nenhuma, e a DLM so seleciona por tag. Taguear pelo
+# Terraform, com aws_ec2_tag, em vez de por `aws ec2 create-tags` a mao: um
+# recurso gerenciado fora do apply e exatamente o problema que este bloco
+# existe para nao repetir. aws_ec2_tag governa uma unica tag sem assumir a
+# posse do volume, que continua provisionado pelo runbook.
+resource "aws_ec2_tag" "airflow_data_volume_backup" {
+    resource_id = var.airflow_data_volume_id
+    key         = "Backup"
+    value       = "airflow-metadata"
+}
+
+resource "aws_iam_role" "dlm_lifecycle" {
+    name = "${local.prefix}-dlm-lifecycle-${local.environment}"
+
+    assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+            Effect    = "Allow"
+            Action    = "sts:AssumeRole"
+            Principal = { Service = "dlm.amazonaws.com" }
+        }]
+    })
+
+    tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "dlm_lifecycle" {
+    role       = aws_iam_role.dlm_lifecycle.name
+    policy_arn = "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
+}
+
+# Snapshot diario do volume que guarda o metadata DB. A janela e 07:00 UTC:
+# depois da run semanal (domingo 06:00 UTC, ~42 min), para que o snapshot de
+# domingo ja contenha o resultado dela.
+resource "aws_dlm_lifecycle_policy" "airflow_metadata" {
+    description        = "Snapshot diario do metadata DB do Airflow (host ${var.airflow_instance_id})"
+    execution_role_arn = aws_iam_role.dlm_lifecycle.arn
+    state              = "ENABLED"
+
+    policy_details {
+        resource_types = ["VOLUME"]
+
+        target_tags = {
+            Backup = aws_ec2_tag.airflow_data_volume_backup.value
+        }
+
+        schedule {
+            name = "diario-7-dias"
+
+            create_rule {
+                interval      = 24
+                interval_unit = "HOURS"
+                times         = ["07:00"]
+            }
+
+            retain_rule {
+                count = 7
+            }
+
+            copy_tags = true
+        }
+    }
+
+    tags = var.tags
+}
+
+# Auto-recovery do host. StatusCheckFailed_System cobre falha da infraestrutura
+# subjacente (host fisico, rede, energia) — o caso em que a instancia nao volta
+# sozinha e a recuperacao manual e um runbook de 8 passos. A acao `recover`
+# migra a instancia para outro host fisico preservando id, IPs e volumes EBS.
+#
+# Nao cobre OOM (que e falha dentro do SO, nao do sistema). Para isso e preciso
+# metrica de memoria, que nao existe: o host nao roda CloudWatch agent. Ver o
+# passo correspondente no PROD_AIRFLOW_EC2_RUNBOOK.
+resource "aws_cloudwatch_metric_alarm" "airflow_host_system_check" {
+    alarm_name          = "${local.prefix}-airflow-host-system-check-${local.environment}"
+    alarm_description   = "Falha de status check de sistema no host do Airflow; dispara auto-recovery."
+    namespace           = "AWS/EC2"
+    metric_name         = "StatusCheckFailed_System"
+    statistic           = "Maximum"
+    comparison_operator = "GreaterThanOrEqualToThreshold"
+    threshold           = 1
+    period              = 60
+    evaluation_periods  = 2
+    treat_missing_data  = "missing"
+
+    dimensions = {
+        InstanceId = var.airflow_instance_id
+    }
+
+    alarm_actions = [
+        "arn:aws:automate:${var.aws_region}:ec2:recover",
+        aws_sns_topic.alerts.arn,
+    ]
+    ok_actions = [aws_sns_topic.alerts.arn]
+
+    tags = var.tags
+}
+
+# ---------------------------------------------------------------------------
+# Ciclo de vida e postura dos buckets de dados
+# ---------------------------------------------------------------------------
+
+# Nao havia nenhuma lifecycle policy (`NoSuchLifecycleConfiguration`), e o
+# bucket de producao ja acumula 6,3 GB em 225 objetos.
+#
+# Cada run semanal grava um **snapshot completo**, nao um delta: os extractors
+# reextraem a janela inteira toda semana (blocos tem exatamente 690 B nas 4
+# runs; despesas, 632,7 / 632,7 / 635,1 / 634,3 MiB). Sao ~1,4 GB por semana
+# com mais de 95% de redundancia, ~75 GB/ano. Retencao, portanto, e a questao —
+# nao higiene.
+resource "aws_s3_bucket_lifecycle_configuration" "catalog" {
+    for_each = aws_s3_bucket.catalog
+    bucket   = each.value.id
+
+    # A regra de versoes nao-atuais so faz sentido com o versionamento ligado.
+    depends_on = [aws_s3_bucket_versioning.catalog]
+
+    # A mais urgente das tres. O _write_s3 aborta o multipart no except, mas um
+    # kill duro do container (OOM, task Fargate morta) deixa partes orfas que
+    # faturam em silencio e nao aparecem em `s3 ls`. O pipeline sobe 632 MB por
+    # multipart toda semana.
+    rule {
+        id     = "abort-incomplete-multipart-uploads"
+        status = "Enabled"
+
+        filter {}
+
+        abort_incomplete_multipart_upload {
+            days_after_initiation = 7
+        }
+    }
+
+    # O versionamento ligado na Sprint 0 e rede de seguranca contra sobrescrita,
+    # nao arquivo permanente: 30 dias cobrem quatro execucoes semanais, que e o
+    # prazo em que uma sobrescrita ainda seria descoberta e revertida.
+    rule {
+        id     = "expire-noncurrent-versions"
+        status = "Enabled"
+
+        filter {}
+
+        noncurrent_version_expiration {
+            noncurrent_days = 30
+        }
+    }
+
+    # ~8 semanas de snapshots ficam quentes; o resto vai para Glacier Instant
+    # Retrieval, que mantem leitura em milissegundos (o dbt pode precisar de
+    # historico) a uma fracao do custo do Standard.
+    rule {
+        id     = "archive-old-snapshots"
+        status = "Enabled"
+
+        filter {
+            prefix = "raw/"
+        }
+
+        transition {
+            days          = 60
+            storage_class = "GLACIER_IR"
+        }
+    }
+}
+
+# SSE e Public Access Block existem nos dois buckets de producao, mas por
+# **default da AWS**, nao por configuracao nossa: nenhum dos dois aparecia neste
+# codigo. Sem o recurso declarado, desligar qualquer um deles nao apareceria em
+# nenhum `terraform plan`. Declarar nao muda o estado atual — fixa-o.
+resource "aws_s3_bucket_server_side_encryption_configuration" "catalog" {
+    for_each = aws_s3_bucket.catalog
+    bucket   = each.value.id
+
+    rule {
+        apply_server_side_encryption_by_default {
+            sse_algorithm = "AES256"
+        }
+    }
+}
+
+resource "aws_s3_bucket_public_access_block" "catalog" {
+    for_each = aws_s3_bucket.catalog
+    bucket   = each.value.id
+
+    block_public_acls       = true
+    block_public_policy     = true
+    ignore_public_acls      = true
+    restrict_public_buckets = true
+}
