@@ -145,7 +145,10 @@ resource "aws_lambda_permission" "cost_report_url" {
     statement_id           = "AllowInvokeFunctionUrlFromAccount"
     action                 = "lambda:InvokeFunctionUrl"
     function_name          = aws_lambda_function.cost_report.function_name
-    principal              = data.aws_caller_identity.current.account_id
+    # Forma ARN, nao o id cru: a AWS normaliza "904464083417" para
+    # "arn:aws:iam::904464083417:root" ao gravar, e como principal forca
+    # replacement o Terraform recriaria esta permission em todo apply.
+    principal              = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
     function_url_auth_type = "AWS_IAM"
 }
 

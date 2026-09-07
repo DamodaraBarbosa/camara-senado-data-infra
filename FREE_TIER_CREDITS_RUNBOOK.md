@@ -63,11 +63,18 @@ Note the account has room for exactly **one** more budget. AWS Budgets includes 
 
 ## 4. Amazon Bedrock activity — USD 20
 
-This one has no Terraform equivalent and needs one prerequisite the console alone can do: **model access**.
+This one has no Terraform equivalent, and as of 2026 it has no prerequisite either. The **Model access page has been retired**: serverless foundation models are enabled automatically, account-wide, in every AWS commercial region the first time they are invoked. There is nothing to request and nothing to wait for.
 
-1. **Amazon Bedrock → Model access → Enable specific models.** Pick a cheap text model (Nova Micro or Titan Text Express). Approval is usually immediate.
-2. Console Home → **Explore AWS** → *Use a foundational model in the Amazon Bedrock playground*.
+1. Console Home → **Explore AWS** → *Use a foundational model in the Amazon Bedrock playground*.
+2. Pick an **Amazon-owned serverless** model — Nova Micro or Titan Text Express.
 3. Submit one short prompt. A single prompt on a micro model costs a fraction of a cent.
+
+Step 2 is not arbitrary. Two categories still carry friction that an Amazon-owned serverless model avoids entirely:
+
+- **Anthropic models** may ask a first-time user to submit use-case details before granting access.
+- **AWS Marketplace models** need a user holding Marketplace permissions to invoke them once before they work account-wide.
+
+Access is still governable — administrators restrict it through IAM policies and SCPs — but nothing needs to be turned *on* first.
 
 The local AWS CLI is version `1.18.69` (2020) and has **no `bedrock` command**, so do not try to script this — the console is the shortest path.
 

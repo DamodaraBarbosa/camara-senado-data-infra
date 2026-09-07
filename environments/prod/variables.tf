@@ -153,7 +153,7 @@ variable "monthly_budget_limit_usd" {
 # tem relacao com o host do Airflow, que continua provisionado a mao.
 variable "enable_credit_activity_instance" {
     type        = bool
-    default     = false
+    default     = true
     description = "Liga a instancia t4g.nano descartavel da atividade de credito do Free Tier"
 }
 
