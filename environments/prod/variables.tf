@@ -154,11 +154,11 @@ variable "monthly_budget_limit_usd" {
 variable "enable_credit_activity_instance" {
     type        = bool
     default     = true
-    description = "Liga a instancia t4g.nano descartavel da atividade de credito do Free Tier"
+    description = "Liga a instancia t4g.micro descartavel da atividade de credito do Free Tier"
 }
 
 # A conta tem seis subnets default, uma delas em us-east-1e — e us-east-1e nao
-# oferece t4g.nano (verificado em ec2:DescribeInstanceTypeOfferings: so a, b,
+# oferece t4g.micro (verificado em ec2:DescribeInstanceTypeOfferings: so a, b,
 # c, d e f). Um `data.aws_subnets` seguido de `ids[0]` pode cair justamente
 # nela e o apply reprova com Unsupported. Por isso a AZ e fixada, nao sorteada.
 variable "credit_activity_availability_zone" {
