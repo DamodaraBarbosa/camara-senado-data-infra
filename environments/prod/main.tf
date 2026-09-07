@@ -23,8 +23,7 @@ resource "aws_s3_bucket" "catalog" {
 #
 # Isto e a rede de seguranca, nao a correcao: a causa esta em
 # task_io.py::_write_s3, que escreve numa chave deterministica por run_id sem
-# nenhuma protecao contra sobrescrita. Ver
-# camara-senado-data-ingestion/AUDITORIA_PRODUCAO_2026-09-02.md (P0-2).
+# nenhuma protecao contra sobrescrita.
 resource "aws_s3_bucket_versioning" "catalog" {
     for_each = aws_s3_bucket.catalog
     bucket   = each.value.id

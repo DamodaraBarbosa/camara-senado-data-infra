@@ -10,8 +10,7 @@
 # proprio, AZ diferente (a do Airflow e us-east-1d), sem instance profile e sem
 # IP publico. Nenhum recurso deste arquivo referencia nenhum daqueles ids.
 #
-# Nasce desligada. Ligar e um PR, desligar e outro — ver
-# FREE_TIER_CREDITS_RUNBOOK.md.
+# Nasce desligada. Ligar e um PR, desligar e outro.
 #
 # Custo: t4g.micro a US$ 0,0084/h mais ~US$ 0,0007/h do volume gp3 de 8 GiB.
 # Uma janela de 30 minutos fica em torno de meio centavo.
