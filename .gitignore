@@ -7,8 +7,15 @@
 *.tfvars.json
 tfplan
 
+# Artefato de build da Lambda, gerado pelo archive_file no plan
+.terraform-build/
+
 # Terraform lock file
 .terraform.lock.hcl
+
+# Python bytecode
+__pycache__/
+*.pyc
 
 # Virtual environment
 venv/

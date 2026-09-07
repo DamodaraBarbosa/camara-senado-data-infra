@@ -127,3 +127,42 @@ variable "airflow_data_volume_id" {
     type        = string
     default     = "vol-06402ad2abd2d4999"
 }
+
+# ---------------------------------------------------------------------------
+# Controle de custo
+#
+# Ate agora a conta tinha um unico orcamento: o `My Zero-Spend Budget` de US$ 1
+# que a AWS cria sozinha em contas do Free Plan, com alerta em qualquer gasto
+# acima de US$ 0,01. Enquanto os creditos cobriam a fatura ele nunca disparou,
+# e o fim do free tier passou despercebido — a conta consumiu US$ 22,57 em
+# creditos entre julho e setembro de 2026 sem nenhum aviso.
+#
+# A franquia do AWS Budgets e de 60 budget-days por mes, ou seja, dois
+# orcamentos ativos o mes inteiro. Com o zero-spend ja ocupando um, este e o
+# segundo e ultimo gratuito: um terceiro passaria a custar US$ 0,02/dia.
+# ---------------------------------------------------------------------------
+variable "monthly_budget_limit_usd" {
+    type        = number
+    default     = 25
+    description = "Limite mensal de custo em USD que dispara os alertas de orcamento"
+}
+
+# Instancia efemera usada para resgatar o credito de US$ 20 da atividade de EC2
+# do Free Tier (widget "Explore AWS" no console). Fica `false` no repositorio:
+# sobe por um PR que a liga, o credito e conferido, e outro PR a desliga. Nao
+# tem relacao com o host do Airflow, que continua provisionado a mao.
+variable "enable_credit_activity_instance" {
+    type        = bool
+    default     = false
+    description = "Liga a instancia t4g.nano descartavel da atividade de credito do Free Tier"
+}
+
+# A conta tem seis subnets default, uma delas em us-east-1e — e us-east-1e nao
+# oferece t4g.nano (verificado em ec2:DescribeInstanceTypeOfferings: so a, b,
+# c, d e f). Um `data.aws_subnets` seguido de `ids[0]` pode cair justamente
+# nela e o apply reprova com Unsupported. Por isso a AZ e fixada, nao sorteada.
+variable "credit_activity_availability_zone" {
+    type        = string
+    default     = "us-east-1a"
+    description = "AZ da subnet default onde a instancia efemera de credito sobe"
+}
