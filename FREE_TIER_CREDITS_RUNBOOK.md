@@ -126,7 +126,22 @@ variable "enable_credit_activity_instance" {
 }
 ```
 
-That creates a `t4g.nano` (USD 0.0042/h) in the default VPC, with a dedicated security group that has no ingress rules, no public IP and an 8 GiB gp3 root volume. It does not touch the Airflow host, its security group or its metadata volume. The AZ is pinned to `us-east-1a` on purpose: **`t4g.nano` is not offered in `us-east-1e`**, and one of the account's six default subnets lives there.
+That creates a `t4g.micro` (USD 0.0084/h) in the default VPC, with a dedicated security group that has no ingress rules, no public IP and an 8 GiB gp3 root volume. It does not touch the Airflow host, its security group or its metadata volume. The AZ is pinned to `us-east-1a` on purpose: **`t4g.micro` is not offered in `us-east-1e`**, and one of the account's six default subnets lives there.
+
+> **A Free Plan account can only launch Free Tier-eligible instance types.** The first attempt used a `t4g.nano` — cheaper, and the obvious choice on price alone — and `RunInstances` refused it outright:
+>
+> ```
+> InvalidParameterCombination: The specified instance type is not eligible
+> for Free Tier.
+> ```
+>
+> The eligible list in us-east-1 is `t3.micro`, `t3.small`, `t4g.micro`, `t4g.small`, `c7i-flex.large` and `m7i-flex.large`. `t4g.micro` is the cheapest arm64 option and runs the same AMI. Confirm the current list with:
+>
+> ```bash
+> aws ec2 describe-instance-types --region us-east-1 \
+>   --filters Name=free-tier-eligible,Values=true \
+>   --query 'InstanceTypes[].InstanceType' --output text
+> ```
 
 > **Let Terraform do the termination.** Do not terminate this instance from the console while `enable_credit_activity_instance` is still `true` — the next prod apply would see it gone and recreate it, so any unrelated push to `main` would silently relaunch it. Flipping the flag back to `false` performs the `TerminateInstances` call *and* removes it from state in one action, which also satisfies the "clean up your instances" half of the activity.
 

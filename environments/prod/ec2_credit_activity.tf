@@ -13,8 +13,8 @@
 # Nasce desligada. Ligar e um PR, desligar e outro — ver
 # FREE_TIER_CREDITS_RUNBOOK.md.
 #
-# Custo: t4g.nano a US$ 0,0042/h mais ~US$ 0,0007/h do volume gp3 de 8 GiB.
-# Uma janela de 30 minutos fica abaixo de meio centavo.
+# Custo: t4g.micro a US$ 0,0084/h mais ~US$ 0,0007/h do volume gp3 de 8 GiB.
+# Uma janela de 30 minutos fica em torno de meio centavo.
 # ---------------------------------------------------------------------------
 
 data "aws_vpc" "default" {
@@ -72,13 +72,20 @@ resource "aws_instance" "credit_activity" {
     count = var.enable_credit_activity_instance ? 1 : 0
 
     ami                    = data.aws_ami.al2023_arm64.id
-    instance_type          = "t4g.nano"
+    # t4g.micro, nao t4g.nano: contas no Free Plan so podem lancar tipos
+    # elegiveis ao Free Tier, e a nano nao e um deles — o RunInstances volta
+    # InvalidParameterCombination e o apply para. Os elegiveis em arm64 sao
+    # t4g.micro e t4g.small; a micro e a mais barata das duas e roda a mesma
+    # AMI. Verificado em ec2:DescribeInstanceTypes com o filtro
+    # free-tier-eligible=true.
+    instance_type          = "t4g.micro"
     subnet_id              = data.aws_subnet.credit_activity.id
     vpc_security_group_ids = [aws_security_group.credit_activity[0].id]
 
     # As subnets default tem MapPublicIpOnLaunch = true, e um IPv4 publico
-    # custa US$ 0,005/h — mais caro que a propria t4g.nano (US$ 0,0042/h).
-    # Sem inbound e sem necessidade de saida, o IP publico so custaria dinheiro.
+    # custa US$ 0,005/h, mais da metade do preco da propria t4g.micro
+    # (US$ 0,0084/h). Sem inbound e sem necessidade de saida, o IP publico so
+    # custaria dinheiro.
     associate_public_ip_address = false
 
     # Sem `iam_instance_profile` de proposito: a policy escopada do role de CI
