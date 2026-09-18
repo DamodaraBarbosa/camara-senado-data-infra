@@ -1,0 +1,59 @@
+{
+  "permissions": {
+    "deny": [
+      {
+        "tool": "Read",
+        "paths": [
+          ".env*",
+          "**/*.tfstate*",
+          "**/.terraform/**",
+          "volume/**",
+          "*.pem",
+          "*.key"
+        ],
+        "reason": "Sensitive: local state, secrets, private keys, LocalStack artifacts"
+      },
+      {
+        "tool": "Edit",
+        "paths": [
+          ".env*",
+          "**/*.tfstate*",
+          "**/.terraform/**",
+          "volume/**"
+        ],
+        "reason": "Sensitive: never commit or modify local state, env files, or cached providers"
+      },
+      {
+        "tool": "Bash",
+        "command": "terraform apply*",
+        "reason": "Destructive: apply is CI-only. Use `terraform plan` and submit a PR."
+      },
+      {
+        "tool": "Bash",
+        "command": "terraform destroy*",
+        "reason": "Destructive: never destroy prod or dev resources locally. Use CI only."
+      },
+      {
+        "tool": "Bash",
+        "command": "terraform import*",
+        "reason": "Destructive: import affects state. Use CI and open a PR with drift documentation."
+      },
+      {
+        "tool": "Bash",
+        "command": "terraform state *",
+        "reason": "Dangerous: state is remote (S3). Use `terraform show` only via CI, never locally."
+      },
+      {
+        "tool": "Bash",
+        "command": "git push --force*",
+        "reason": "Destructive: force-push rewrites history. Use normal push via PR workflow."
+      }
+    ]
+  },
+  "comments": {
+    "terraform_apply_is_ci_only": "Never run 'terraform apply' locally. Merging to 'main' triggers prod deploy immediately.",
+    "global_is_manual": "Changes to global/ must be applied manually after reviewing OIDC and IAM impact.",
+    "aws_account_id_placeholder": "Use <AWS_ACCOUNT_ID> in new docs, not the hardcoded value.",
+    "oidc_trust_is_critical": "The prod OIDC trust policy restricts to 'main' branch and 'environment:production' gate. Do not loosen."
+  }
+}

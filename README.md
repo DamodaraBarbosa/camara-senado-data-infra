@@ -9,16 +9,30 @@ This repository contains the Infrastructure as Code (IaC) to manage the data pla
 
 ## 📁 Project Structure
 
-- `environments/`: Environment-specific Terraform configurations.
-  - `dev/`: Development environment (targets LocalStack by default, can be re-configured for AWS).
-  - `prod/`: Production environment (targets real AWS).
-- `global/`: Account-wide IAM resources shared across environments.
-  - `github_oidc.tf`: GitHub Actions OIDC identity provider for keyless CI/CD authentication.
+- `environments/`: Environment-specific Terraform configurations (each with its own S3 backend).
+  - `dev/`: Development environment (real AWS, not LocalStack).
+    - `main.tf`: 433 lines, provisions buckets, Glue, ECR, IAM, ECS cluster and task definition.
+    - `variables.tf`, `provider.tf`, `locals.tf`.
+  - `prod/`: Production environment (real AWS).
+    - `main.tf`: 691 lines, same as dev plus prod-only resources.
+    - `budgets.tf`: Monthly cost budget with SNS notification.
+    - `lambda_cost_report.tf`: Lambda function and EventBridge weekly schedule for cost reports.
+    - `ec2_credit_activity.tf`: Ephemeral EC2 instance (t4g.micro) for Free Tier credit activity (disabled by default).
+    - `variables.tf`, `provider.tf`, `locals.tf`.
+- `global/`: Account-wide IAM resources (manually applied, not in CI).
+  - `github_oidc.tf`: GitHub Actions OIDC provider for keyless CI/CD auth.
   - `groups_users.tf`: IAM groups and users (`tech_leadership`, `analytics_engineers`, `data_engineers`, `bi_users`).
-- `utils/`: Helper scripts (e.g., `list_iam.py` to visualize IAM hierarchy in LocalStack).
+  - `variables.tf`, `provider.tf`, `locals.tf`.
+- `modules/`: Empty directories (unused; all resources are self-contained in root modules).
+- `utils/`: Helper scripts.
+  - `list_iam.py`: Visualizes IAM hierarchy using boto3 + LocalStack endpoint (legacy, not in use).
+  - `requirements.txt`: Python dependencies.
+- `docker-compose.yml`: Old LocalStack service config (obsolete, kept for reference only).
 - `.github/workflows/`: GitHub Actions CI/CD pipeline.
-- `requirements.txt`: Python dependencies for utility scripts.
-- `docker-compose.yml`: LocalStack service configuration for local development.
+- `.claude/`: Claude Code setup.
+  - `CLAUDE.md`: Repository conventions and commands.
+  - `rules/`: Path-scoped rules for Terraform, IAM, CI/CD, Python utilities.
+  - `settings.json`: Security guardrails and permission denies.
 
 ## 🏗️ Infrastructure Overview
 
@@ -53,90 +67,173 @@ IAM roles with scoped permissions:
 
 ## ✅ Prerequisites
 
-- 🐳 [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
-- 🧱 [Terraform](https://www.terraform.io/) (v1.0.0+)
-- ☁️ [AWS CLI](https://aws.amazon.com/cli/)
-- 🐍 [Python 3.x](https://www.python.org/)
+- 🧱 [Terraform](https://www.terraform.io/) (v1.10+; CI pins 1.14.7)
+- ☁️ [AWS CLI](https://aws.amazon.com/cli/) with credentials for dev and prod AWS accounts
+- 🐍 [Python 3.x](https://www.python.org/) (optional, only for utility scripts)
+- 🔑 AWS IAM roles for GitHub Actions OIDC (configured in GitHub repository settings)
 
 ## 🛠️ Installation & Setup
 
-### 1. Python Environment
-It is highly recommended to use a virtual environment to run the utility scripts.
+### 1. Remote Backend Buckets
+
+Three S3 state buckets are manually provisioned (outside Terraform):
+
+| Root | State Bucket | State Key |
+|---|---|---|
+| `global/` | `dataplatform-terraform-state-<account>-global` | `global/terraform.tfstate` |
+| `environments/dev` | `dataplatform-terraform-state-<account>-dev` | `dev/terraform.tfstate` |
+| `environments/prod` | `dataplatform-terraform-state-<account>-prod` | `prod/terraform.tfstate` |
+
+Each bucket must exist before running `terraform init`. Contact your AWS admin if missing.
+
+### 2. AWS Credentials
+
+Export AWS credentials for the target account:
 
 ```bash
-# Create a virtual environment
-python3 -m venv venv
-
-# Activate it
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+export AWS_DEFAULT_REGION=us-east-1
+# Either:
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+# OR:
+aws sso login --profile <profile-name>
+export AWS_PROFILE=<profile-name>
 ```
 
-### 2. Start Local Infrastructure (LocalStack)
-The project uses LocalStack to simulate AWS services locally.
+### 3. Terraform Workflow
 
-```bash
-docker compose up -d
-```
-
-## 💻 Local Development (Dev Environment)
-
-Navigate to the `dev` environment to provision local resources:
+For **dev environment**:
 
 ```bash
 cd environments/dev
-terraform init
-terraform apply
+terraform init                    # Requires state bucket + AWS creds
+terraform validate               # Check syntax
+terraform plan -out=tfplan.dev   # Preview changes
+terraform apply tfplan.dev       # Apply (local testing only — CI applies on merge)
 ```
 
-### 🧰 Utility Scripts
+For **prod environment**: same pattern, working directory `environments/prod`. **Never apply locally to prod.** Use CI.
 
-List the IAM hierarchy (Groups, Users, and Roles) created in LocalStack:
+### 4. Global (Manual Bootstrap)
+
+To initialize account-wide IAM and OIDC:
 
 ```bash
-# From the project root
-python utils/list_iam.py
+cd global
+terraform init
+terraform validate
+terraform apply                   # Manual only; not in CI
 ```
 
-### 🔍 Verification
+This must run before dev/prod can authenticate via OIDC in CI.
 
-Manually verify created resources using the AWS CLI pointing to LocalStack:
+### 5. Python Environment (Optional)
 
-- **S3 Buckets:** `aws --endpoint-url=http://localhost:4566 s3 ls`
-- **IAM Users:** `aws --endpoint-url=http://localhost:4566 iam list-users`
-- **IAM Groups:** `aws --endpoint-url=http://localhost:4566 iam list-groups`
+For utility scripts only (not required for Terraform):
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Note:** `utils/list_iam.py` targets LocalStack (no longer in use). It is kept for reference.
 
 ## 🔄 CI/CD with GitHub Actions
 
-The repository includes a GitHub Actions workflow (`.github/workflows/terraform.yml`) that automatically applies Terraform changes using keyless OIDC authentication — no static AWS credentials are stored or used.
+`.github/workflows/terraform.yml` is the only workflow. It uses Terraform to apply changes via keyless OIDC authentication (no static AWS credentials stored).
 
-### ⚡ Workflow Triggers and Jobs
+### ⚡ Workflow Behavior
 
-| Job | Trigger | Auto-Apply | IAM Role |
-|---|---|---|---|
-| `terraform-dev` | Push/PR to `develop` | Push only | `AWS_ROLE_ARN_DEV` |
-| `terraform-prod` | Push/PR to `main` | Push only | `AWS_ROLE_ARN_PROD` |
+| Trigger | Job | Environment | Auto-Apply | Role |
+|---|---|---|---|---|
+| Push/PR to `develop` | `terraform-dev` | `development` (no gate) | Push only | `AWS_ROLE_ARN_DEV` |
+| Push/PR to `main` | `terraform-prod` | `production` (manual approval required) | Push only | `AWS_ROLE_ARN_PROD` |
 
-Both jobs always run `terraform init`, `validate`, and `plan`. PRs are plan-only — `terraform apply -auto-approve` runs only on push events.
+**PRs:** Both jobs run `terraform init`, `validate`, `plan`. The plan appears in the PR comments; no apply.
 
-### 🔧 Setup Requirements
+**Pushes:** Same jobs, plus `terraform apply -auto-approve` (dev on push to `develop`, prod on push to `main` after approval).
 
-To enable the GitHub Actions workflow, configure the following **repository variables** (not secrets) in your GitHub repository settings:
+### 🚫 What CI Does NOT Do
 
-- `AWS_ROLE_ARN_DEV`: ARN of the GitHub Actions IAM role for the dev environment (e.g., `arn:aws:iam::ACCOUNT_ID:role/dataplatform_github_actions_dev`).
-- `AWS_ROLE_ARN_PROD`: ARN of the GitHub Actions IAM role for the prod environment (e.g., `arn:aws:iam::ACCOUNT_ID:role/dataplatform_github_actions_prod`).
+- Does not run `terraform fmt` (would fail repo-wide; see gaps section below).
+- Does not run `tflint` or static analysis.
+- Does not apply `global/` (manual only; OIDC setup is bootstrapped once).
 
-The workflow uses `aws-actions/configure-aws-credentials@v4` with the `role-to-assume` parameter pointing to these roles. The OIDC trust relationship is pre-configured in the IAM role and restricts assumptions to events from the GitHub repository and branch specified in the role's trust policy.
+### 🚀 Deployment Workflow (Branches)
 
-### 🚀 Deployment Workflow
+1. **Feature branch:** `feat/`, `fix/`, `chore/`, etc.
+2. **PR to `develop`:** Tests in dev environment (plan-only).
+3. **Merge to `develop`:** Auto-applies to dev AWS account.
+4. **PR `develop` → `main`:** Tests in prod (plan-only).
+5. **Merge to `main`:** Requires GitHub approval (via `environment: production` gate), then auto-applies to prod AWS account.
 
-1. Create a new branch for your infrastructure changes.
-2. Push to `develop` and open a pull request to test changes in the `dev` environment (plan-only).
-3. Merge to `develop` once approved; the `terraform-dev` job automatically applies changes to dev.
-4. Open a pull request from `develop` to `main` to prepare production changes.
-5. Merge to `main` once approved; the `terraform-prod` job automatically applies changes to prod.
+**⚠️ Warning:** Merging to `main` immediately deploys to production. Review changes carefully before merge.
+
+### 🔧 GitHub Setup
+
+Configure these **repository variables** (not secrets) in GitHub Settings:
+
+- `AWS_ROLE_ARN_DEV`: ARN of dev GitHub Actions IAM role (e.g., `arn:aws:iam::<AWS_ACCOUNT_ID>:role/dataplatform_github_actions_dev`).
+- `AWS_ROLE_ARN_PROD`: ARN of prod GitHub Actions IAM role (e.g., `arn:aws:iam::<AWS_ACCOUNT_ID>:role/dataplatform_github_actions_prod`).
+
+Both roles are created in `global/main.tf`. Their OIDC trust policies restrict:
+- **Dev:** Any branch in the repo (`repo:*`).
+- **Prod:** `main` branch only + pull request events + `environment: production` approval.
+
+### 🔍 CI Filters
+
+The workflow ignores these paths (to avoid stalling on doc changes):
+
+```yaml
+paths-ignore:
+  - "**.md"
+  - "utils/**"
+  - "docker-compose.yml"
+  - "requirements.txt"
+```
+
+Changes to `.claude/settings.json` or `.claude/rules/` will trigger the workflow (they are `.md` files but contain infrastructure context, so this is acceptable).
+
+## 🚨 Known Issues & Gaps
+
+### Formatting
+
+`terraform fmt -check -recursive` currently fails on all `.tf` files (indentation inconsistency). This is not enforced in CI; refactoring is deferred. Do not reformat unrelated code when making changes.
+
+### Local State Files
+
+Stale `*.tfstate` and `*.tfstate.backup` files exist under `environments/dev` and `environments/prod`. These are gitignored and can be safely deleted (real state lives in S3). Do not commit them.
+
+### Dead Variables
+
+Both `dev` and `prod` define but never use:
+
+- `var.emr_release_label`
+- `var.cluster_name`, `var.cluster_node_type`, `var.cluster_num_nodes`, `var.cluster_bootstrap_action_path`
+- `var.localstack_endpoint`
+
+These are remnants of earlier designs. Do not remove them (compatibility), but do not use them.
+
+### Hardcoded Identifiers
+
+Prod hardcodes (already committed, OK):
+
+- AWS account ID in comments and `variables.tf` defaults for Airflow instance/volume IDs.
+- SNS topic ARN default.
+
+Do not spread these to new documentation; use placeholders like `<AWS_ACCOUNT_ID>`.
+
+## 🔗 Related Repository
+
+**`camara-senado-data-ingestion`** (Python)
+
+This repo provisions the AWS infrastructure. The sibling repo provides:
+- Data extraction code (Câmara APIs, bulk files, CEAP cotas).
+- Airflow DAGs that invoke ECS tasks provisioned here.
+- ECR Docker image (pushed to the ECR repo created by this IaC).
+
+See the ingestion repo's `CLAUDE.md` for architecture and data flow details.
 
 ---
 
