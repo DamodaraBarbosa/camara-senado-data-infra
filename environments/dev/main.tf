@@ -19,12 +19,12 @@ resource "aws_glue_catalog_database" "catalog_db" {
       for bucket in local.s3_buckets : [
         for schema in var.schema_names : {
           key    = "${bucket}.${schema}"
-          db_name = "${bucket}_${schema}"
+          db_name = "${bucket}-${schema}"
         }
       ]
     ]) : pair.key => pair.db_name
   }
-  
+
   name = lower(each.value)
 
   parameters = {
