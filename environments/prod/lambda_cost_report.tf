@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Relatorio semanal de custo
+# Relatorio diario de custo
 #
 # A auditoria de 2026-09-02 registrou que uma falha em producao era totalmente
 # silenciosa. O mesmo valia para o custo: com o credito do Free Tier abatendo a
@@ -152,17 +152,19 @@ resource "aws_lambda_permission" "cost_report_url" {
     function_url_auth_type = "AWS_IAM"
 }
 
-# Segunda-feira 12:00 UTC: depois da run semanal do pipeline (domingo 06:00
-# UTC, ~42 min), para que o relatorio ja inclua o custo dela.
-resource "aws_cloudwatch_event_rule" "cost_report_weekly" {
-    name                = "${local.prefix}-cost-report-weekly-${local.environment}"
-    description         = "Dispara o relatorio semanal de custo da plataforma de dados"
-    schedule_expression = "cron(0 12 ? * MON *)"
+# 22:00 UTC todo dia = 19:00 BRT (America/Sao_Paulo, UTC-3 fixo: o Brasil
+# aboliu horario de verao em 2019, entao este cron nao precisa de ajuste
+# sazonal). Era semanal (segunda 12:00 UTC); passou a diario para dar
+# visibilidade de custo dia a dia em vez de uma vez por semana.
+resource "aws_cloudwatch_event_rule" "cost_report_daily" {
+    name                = "${local.prefix}-cost-report-daily-${local.environment}"
+    description         = "Dispara o relatorio diario de custo da plataforma de dados"
+    schedule_expression = "cron(0 22 * * ? *)"
     tags                = var.tags
 }
 
-resource "aws_cloudwatch_event_target" "cost_report_weekly" {
-    rule      = aws_cloudwatch_event_rule.cost_report_weekly.name
+resource "aws_cloudwatch_event_target" "cost_report_daily" {
+    rule      = aws_cloudwatch_event_rule.cost_report_daily.name
     target_id = "cost-report-lambda"
     arn       = aws_lambda_function.cost_report.arn
 }
@@ -172,7 +174,7 @@ resource "aws_lambda_permission" "cost_report_events" {
     action        = "lambda:InvokeFunction"
     function_name = aws_lambda_function.cost_report.function_name
     principal     = "events.amazonaws.com"
-    source_arn    = aws_cloudwatch_event_rule.cost_report_weekly.arn
+    source_arn    = aws_cloudwatch_event_rule.cost_report_daily.arn
 }
 
 # Nao existe outputs.tf neste ambiente e criar um arquivo para um unico valor

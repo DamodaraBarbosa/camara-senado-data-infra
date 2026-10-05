@@ -1,4 +1,4 @@
-"""Weekly month-to-date AWS cost report for the data platform.
+"""Daily month-to-date AWS cost report for the data platform.
 
 Publishes two numbers the Billing console does not show side by side: what the
 account actually consumed, and how much of that a Free Tier credit absorbed.
